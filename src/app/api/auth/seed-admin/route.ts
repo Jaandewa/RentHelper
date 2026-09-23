@@ -26,9 +26,10 @@ export async function POST() {
     const email = 'admin@renthelper.lk'
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
-      // Ensure status is active
-      await prisma.user.update({ where: { email }, data: { status: 'active' } })
-      results.push('Admin already exists — status refreshed')
+      // Force-reset password and ensure status is active
+      const password = await bcrypt.hash('Admin@1234', 12)
+      await prisma.user.update({ where: { email }, data: { status: 'active', role: 'admin', password } })
+      results.push('Admin already exists — password and status refreshed')
     } else {
       const password = await bcrypt.hash('Admin@1234', 12)
       await prisma.user.create({
