@@ -28,20 +28,19 @@ function SignInContent() {
       if (res?.error) {
         setError('Invalid email or password')
       } else {
-        // Fetch session to check role, then redirect accordingly
+        // Use window.location for full page reload to pick up auth cookies
         const sessionRes = await fetch('/api/auth/session')
         const session = await sessionRes.json()
         const role = session?.user?.role
 
         const callbackUrl = searchParams.get('callbackUrl')
         if (callbackUrl && !callbackUrl.includes('/auth/')) {
-          router.push(callbackUrl)
+          window.location.href = decodeURI(callbackUrl)
         } else if (role === 'admin') {
-          router.push('/admin')
+          window.location.href = '/admin'
         } else {
-          router.push('/dashboard')
+          window.location.href = '/dashboard'
         }
-        router.refresh()
       }
     } catch (err) {
       setError('An error occurred. Please try again.')
