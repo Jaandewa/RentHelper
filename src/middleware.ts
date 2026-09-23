@@ -1,7 +1,10 @@
+import NextAuth from 'next-auth'
+import { authConfig } from '@/lib/auth.config'
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 
-export default auth((req) => {
+const { auth: middleware } = NextAuth(authConfig)
+
+export default middleware((req) => {
   const { pathname } = req.nextUrl
 
   const protectedRoutes = [
@@ -13,7 +16,7 @@ export default auth((req) => {
 
   if (!isProtected) return NextResponse.next()
 
-  // req.auth is populated by NextAuth v5
+  // req.auth is populated by NextAuth v5 middleware
   const session = req.auth
 
   // Not authenticated → redirect to sign in

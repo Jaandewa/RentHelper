@@ -5,12 +5,11 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
 import prisma from './prisma'
 import { cookies } from 'next/headers'
+import { authConfig } from './auth.config'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
-  session: { strategy: 'jwt' },
-  pages: { signIn: '/auth/signin' },
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -43,6 +42,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     })
   ],
   callbacks: {
+    ...authConfig.callbacks,
     async signIn({ user, account, profile }) {
       if (account?.provider === 'google') {
         const existingUser = await prisma.user.findUnique({
@@ -56,24 +56,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
       return true
-    },
-    async jwt({ token, user, account }) {
-      if (account?.provider === 'google') {
-        token.access_token = account.access_token
-        token.refresh_token = account.refresh_token
-      }
-      if (user) {
-        token.id = user.id
-        token.role = user.role || 'customer'
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id ?? ''
-        session.user.role = token.role ?? 'customer'
-      }
-      return session
     }
   }
 })
