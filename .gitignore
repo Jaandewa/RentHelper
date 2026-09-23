@@ -48,3 +48,8 @@ liteSpeed-server.js
 CLAUDE.md
 AGENTS.md
 .agents/
+.env 
+setup-database.bat 
+git-commit.bat 
+git-push.bat 
+hostgator-upload.php 
