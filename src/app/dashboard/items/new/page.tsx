@@ -20,6 +20,8 @@ const CATEGORIES = [
 export default function NewItemPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [isUploadingImages, setIsUploadingImages] = useState(false)
+  const [images, setImages] = useState<string[]>([])
   const [accessories, setAccessories] = useState<string[]>([])
   const [accessoryInput, setAccessoryInput] = useState('')
   const [form, setForm] = useState({
@@ -63,7 +65,7 @@ export default function NewItemPage() {
       const res = await fetch('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, accessories }),
+        body: JSON.stringify({ ...form, accessories, images }),
       })
       if (res.ok) {
         router.push('/dashboard/items')
@@ -75,6 +77,36 @@ export default function NewItemPage() {
       alert('Network error')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setIsUploadingImages(true)
+    const formData = new FormData()
+    for (let i = 0; i < files.length; i++) {
+      formData.append('images[]', files[i])
+    }
+
+    try {
+      const res = await fetch('https://uploads.healingcity.lk/index.php', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json()
+      
+      if (data.success && data.files) {
+        const newUrls = data.files.map((f: any) => f.url)
+        setImages(prev => [...prev, ...newUrls])
+      } else {
+        alert(data.errors?.join('\n') || 'Failed to upload images')
+      }
+    } catch (err) {
+      alert('Error connecting to image server')
+    } finally {
+      setIsUploadingImages(false)
     }
   }
 
@@ -229,14 +261,50 @@ export default function NewItemPage() {
           </div>
         </div>
 
-        {/* Photo Upload Placeholder */}
+        {/* Photo Upload */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Photos</h2>
-          <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer">
-            <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-            <p className="text-sm font-medium text-gray-700">Click to upload or drag & drop</p>
-            <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 10MB each (max 10 photos)</p>
-          </div>
+          
+          <label className="block border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors cursor-pointer relative">
+            <input 
+              type="file" 
+              multiple 
+              accept="image/jpeg, image/png, image/webp" 
+              onChange={handleImageUpload} 
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+              disabled={isUploadingImages}
+            />
+            {isUploadingImages ? (
+              <div className="animate-pulse">
+                <Upload className="w-10 h-10 text-blue-400 mx-auto mb-3" />
+                <p className="text-sm font-medium text-blue-700">Uploading to server...</p>
+              </div>
+            ) : (
+              <>
+                <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                <p className="text-sm font-medium text-gray-700">Click to upload or drag & drop</p>
+                <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 10MB each (max 10 photos)</p>
+              </>
+            )}
+          </label>
+
+          {images.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {images.map((url, idx) => (
+                <div key={idx} className="relative aspect-square rounded-lg border border-gray-200 overflow-hidden group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`Upload ${idx+1}`} className="w-full h-full object-cover" />
+                  <button 
+                    type="button" 
+                    onClick={() => setImages(prev => prev.filter((_, i) => i !== idx))}
+                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Notes */}

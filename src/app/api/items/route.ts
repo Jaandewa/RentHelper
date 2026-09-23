@@ -101,6 +101,13 @@ export async function POST(req: Request) {
         replacementCost: replacementCost ? parseFloat(replacementCost) : null,
         notes,
         accessories: accessories ? JSON.stringify(accessories) : null,
+        itemImages: body.images && body.images.length > 0 ? {
+          create: body.images.map((url: string, index: number) => ({
+            url,
+            fileName: url.split('/').pop() || 'image.jpg',
+            sortOrder: index
+          }))
+        } : undefined,
       }
     })
 
