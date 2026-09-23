@@ -1,0 +1,510 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  name            String?
+  email           String?   @unique
+  emailVerified   DateTime?
+  image           String?
+  password        String?
+  role            String    @default("customer") // provider, customer, admin
+  status          String    @default("active") // active, suspended, banned
+  suspendedUntil  DateTime?
+  suspendReason   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  businessProfile Business?
+  customerProfile CustomerProfile?
+  activityLogs    ActivityLog[]
+  addedBlacklists BlacklistEntry[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Business {
+  id                     String    @id @default(cuid())
+  userId                 String    @unique
+  name                   String
+  slug                   String    @unique
+  description            String?
+  phone                  String?
+  address                String?
+  city                   String?
+  logo                   String?
+  registrationNumber     String?
+  currency               String    @default("LKR")
+  timezone               String    @default("Asia/Colombo")
+  advancePaymentPercent  Float     @default(30)
+  depositPolicy          String?
+  cancellationPolicy     String?
+  isActive               Boolean   @default(true)
+  onboardingStep         Int       @default(0)
+  approvalStatus         String    @default("pending") // pending, approved, rejected, suspended
+  approvalNote           String?
+  approvedBy             String?
+  approvedAt             DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categories          BusinessCategory[]
+  items               Item[]
+  bookings            Booking[]
+  calendarIntegration CalendarIntegration?
+  providerRatings     ProviderRating[]
+  customerRatings     CustomerRating[]
+  subscription        Subscription?
+
+  @@index([slug])
+  @@index([approvalStatus])
+  @@map("businesses")
+}
+
+model BusinessCategory {
+  id           String   @id @default(cuid())
+  businessId   String
+  categorySlug String
+
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, categorySlug])
+  @@index([businessId])
+  @@map("business_categories")
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  icon        String?
+  description String?
+  sortOrder   Int     @default(0)
+
+  items       Item[]
+
+  @@index([slug])
+  @@map("categories")
+}
+
+model CustomerProfile {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  nicNumber               String?
+  nicNumberEncrypted      String?
+  dateOfBirth             DateTime?
+  emergencyContact        String?
+  emergencyPhone          String?
+  address                 String?
+  city                    String?
+  kycStatus               String    @default("pending") // pending, verified, rejected, needs_more_info
+  kycRejectionReason      String?
+  allowCrossProviderShare Boolean   @default(true)
+  trustScore              Float     @default(0)
+  totalBookings           Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerDocuments CustomerDocument[]
+  bookings          Booking[]
+  customerRatings   CustomerRating[]
+  providerRatings   ProviderRating[]
+  kycApprovals      KYCApproval[]
+  blacklistEntries  BlacklistEntry[]
+
+  @@index([userId])
+  @@map("customer_profiles")
+}
+
+model CustomerDocument {
+  id         String   @id @default(cuid())
+  customerId String
+  type       String   // nic_front, nic_back, passport, driving_license, selfie_with_id
+  url        String
+  fileName   String
+  fileSize   Int?
+  uploadedAt DateTime @default(now())
+
+  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("customer_documents")
+}
+
+model Item {
+  id                  String    @id @default(cuid())
+  businessId          String
+  categoryId          String
+  name                String
+  sku                 String?
+  brand               String?
+  model               String?
+  serialNumber        String?
+  description         String?
+  purchaseDate        DateTime?
+  purchasePrice       Float?
+  replacementCost     Float?
+  conditionGrade      String    @default("good") // excellent, good, fair, poor
+  status              String    @default("available") // available, booked, rented, overdue, maintenance, damaged, retired
+  hourlyRate          Float?
+  dailyRate           Float
+  weeklyRate          Float?
+  monthlyRate         Float?
+  depositAmount       Float     @default(0)
+  bufferHours         Int       @default(2)
+  lastServiceDate     DateTime?
+  nextServiceDue      DateTime?
+  serviceIntervalDays Int?
+  accessories         String?   // JSON string
+  notes               String?
+  isActive            Boolean   @default(true)
+  qrCode              String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category     Category      @relation(fields: [categoryId], references: [id])
+  itemImages   ItemImage[]
+  bookingItems BookingItem[]
+
+  @@index([businessId])
+  @@index([categoryId])
+  @@index([status])
+  @@map("items")
+}
+
+model ItemImage {
+  id        String @id @default(cuid())
+  itemId    String
+  url       String
+  fileName  String
+  sortOrder Int    @default(0)
+
+  item      Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@map("item_images")
+}
+
+model Booking {
+  id                    String    @id @default(cuid())
+  businessId            String
+  customerId            String
+  bookingNumber         String    @unique
+  status                String    @default("quotation") // quotation, pending_confirmation, confirmed, active, returned_pending_settlement, completed, cancelled, no_show
+  paymentStatus         String    @default("unpaid") // unpaid, partially_paid, paid, overdue, refund_pending, refunded
+  pickupDate            DateTime
+  returnDate            DateTime
+  actualReturnDate      DateTime?
+  subtotal              Float
+  deliveryCharge        Float     @default(0)
+  discountAmount        Float     @default(0)
+  advanceAmount         Float     @default(0)
+  depositAmount         Float     @default(0)
+  depositRefunded       Float     @default(0)
+  lateFee               Float     @default(0)
+  damageCharge          Float     @default(0)
+  totalAmount           Float
+  balanceDue            Float
+  notes                 String?
+  checkoutNotes         String?
+  checkinNotes          String?
+  customerSignatureUrl  String?
+  calendarEventId       String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  business        Business         @relation(fields: [businessId], references: [id])
+  customer        CustomerProfile  @relation(fields: [customerId], references: [id])
+  bookingItems    BookingItem[]
+  payments        Payment[]
+  invoices        Invoice[]
+  customerRating  CustomerRating?
+  providerRating  ProviderRating?
+
+  @@index([businessId])
+  @@index([customerId])
+  @@index([bookingNumber])
+  @@index([status])
+  @@index([paymentStatus])
+  @@map("bookings")
+}
+
+model BookingItem {
+  id                 String  @id @default(cuid())
+  bookingId          String
+  itemId             String
+  quantity           Int     @default(1)
+  dailyRate          Float
+  days               Int
+  itemTotal          Float
+  conditionOnReturn  String?
+  accessoriesReturned String? // JSON string
+  notes              String?
+
+  booking            Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  item               Item    @relation(fields: [itemId], references: [id])
+
+  @@index([bookingId])
+  @@index([itemId])
+  @@map("booking_items")
+}
+
+model Invoice {
+  id            String    @id @default(cuid())
+  bookingId     String
+  invoiceNumber String    @unique
+  type          String    @default("invoice") // quotation, invoice, receipt
+  pdfUrl        String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  booking       Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([invoiceNumber])
+  @@map("invoices")
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  bookingId String
+  amount    Float
+  type      String   // advance, deposit, balance, refund, damage
+  method    String   // cash, bank_transfer, card, online
+  reference String?
+  notes     String?
+  paidAt    DateTime @default(now())
+
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("payments")
+}
+
+model CalendarIntegration {
+  id           String    @id @default(cuid())
+  businessId   String    @unique
+  accessToken  String
+  refreshToken String
+  tokenExpiry  DateTime
+  calendarId   String?
+  syncEnabled  Boolean   @default(true)
+  lastSyncAt   DateTime?
+
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_integrations")
+}
+
+model CustomerRating {
+  id                 String   @id @default(cuid())
+  bookingId          String   @unique
+  providerId         String
+  customerId         String
+  conditionScore     Float
+  timelinessScore    Float
+  communicationScore Float
+  overallScore       Float
+  review             String?
+  createdAt          DateTime @default(now())
+
+  booking            Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  provider           Business        @relation(fields: [providerId], references: [id])
+  customer           CustomerProfile @relation(fields: [customerId], references: [id])
+
+  @@index([providerId])
+  @@index([customerId])
+  @@map("customer_ratings")
+}
+
+model ProviderRating {
+  id                 String   @id @default(cuid())
+  bookingId          String   @unique
+  businessId         String
+  customerId         String
+  itemQualityScore   Float
+  valueScore         Float
+  serviceScore       Float
+  cleanlinessScore   Float
+  overallScore       Float
+  review             String?
+  providerResponse   String?
+  createdAt          DateTime @default(now())
+
+  booking            Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  business           Business        @relation(fields: [businessId], references: [id])
+  customer           CustomerProfile @relation(fields: [customerId], references: [id])
+
+  @@index([businessId])
+  @@index([customerId])
+  @@map("provider_ratings")
+}
+
+model BlacklistEntry {
+  id             String    @id @default(cuid())
+  customerId     String
+  reason         String
+  severity       String    // warning, suspended, permanent
+  suspendedUntil DateTime?
+  addedBy        String
+  evidence       String?
+  isActive       Boolean   @default(true)
+  appealNote     String?
+  createdAt      DateTime  @default(now())
+
+  customer       CustomerProfile @relation(fields: [customerId], references: [id])
+  user           User            @relation(fields: [addedBy], references: [id])
+
+  @@index([customerId])
+  @@index([addedBy])
+  @@map("blacklist_entries")
+}
+
+model KYCApproval {
+  id          String   @id @default(cuid())
+  customerId  String
+  action      String   // submitted, approved, rejected, needs_more_info
+  performedBy String
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([performedBy])
+  @@map("kyc_approvals")
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // booking_confirmation, pickup_reminder, return_reminder, overdue_alert, payment_due, review_request, kyc_status, extension_request
+  channel     String   // email, whatsapp, sms, push
+  status      String   @default("pending") // pending, sent, failed
+  subject     String?
+  body        String
+  scheduledAt DateTime
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String
+  details    String?  // JSON string
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}
+
+model Subscription {
+  id               String    @id @default(cuid())
+  businessId       String    @unique
+  status           String    @default("trial") // trial, active, expired, cancelled, suspended
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime?
+  pricePerMonth    Float     @default(0)
+  planName         String    @default("Free Trial")
+  maxItems         Int       @default(5)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model SiteSettings {
+  id                    String   @id @default("1")
+  siteName              String   @default("RentHelper")
+  siteTagline           String   @default("Smart Rental Management")
+  logoUrl               String?
+  faviconUrl            String?
+  primaryColor          String   @default("#7C3AED")
+  secondaryColor        String   @default("#4F46E5")
+  googleClientId        String?
+  googleClientSecret    String?
+  emailFromName         String   @default("RentHelper")
+  emailFromAddress      String   @default("noreply@renthelper.lk")
+  smtpHost              String?
+  smtpPort              Int      @default(587)
+  smtpUser              String?
+  smtpPass              String?
+  maintenanceMode       Boolean  @default(false)
+  allowNewRegistrations Boolean  @default(true)
+  defaultTrialDays      Int      @default(30)
+  subscriptionPrice     Float    @default(1500)
+  subscriptionName      String   @default("Standard Plan")
+  subscriptionMaxItems  Int      @default(50)
+  itemFieldConfig       String?  // JSON: { fieldKey: { required: bool, visible: bool, label: string } }
+  updatedAt             DateTime @updatedAt
+  updatedBy             String?
+
+  @@map("site_settings")
+}
