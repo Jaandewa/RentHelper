@@ -108,13 +108,13 @@ export default function CategoriesPage() {
                     className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
                     style={{ background: palette.bg, color: palette.color }}
                   >
-                    {cat.icon || '📦'}
+                    {cat.icon === 'Package' ? <Package className="w-6 h-6" /> : cat.icon || '📦'}
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">{cat.name}</p>
                     <p className="text-sm text-gray-500">{myItems} item{myItems !== 1 ? 's' : ''}</p>
-                    {cat.description && (
-                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{cat.description}</p>
+                    {cat.slug.startsWith('custom-') && (
+                      <p className="text-xs text-blue-500 mt-0.5">Custom Category</p>
                     )}
                   </div>
                 </div>
@@ -131,16 +131,34 @@ export default function CategoriesPage() {
       )}
 
       {/* Info Banner */}
-      {categories.length > 0 && (
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3 justify-between">
+        <div className="flex gap-3">
           <Package className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
           <p className="text-sm text-blue-700">
-            Click any category to see your items in that category. To add a new item, go to{' '}
-            <Link href="/dashboard/items/new" className="font-medium underline">Items → Add Item</Link>{' '}
-            and select a category there.
+            Need a specific sub-category for your items? You can create custom categories for your business.
           </p>
         </div>
-      )}
+        <button 
+          onClick={async () => {
+            const name = prompt('Enter custom category name (e.g. Wedding Drones):')
+            if (name) {
+              const res = await fetch('/api/categories/custom', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+              })
+              if (res.ok) {
+                window.location.reload()
+              } else {
+                alert('Failed to add category')
+              }
+            }
+          }}
+          className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 whitespace-nowrap"
+        >
+          + Add Custom Category
+        </button>
+      </div>
     </div>
   )
 }

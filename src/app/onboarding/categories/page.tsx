@@ -21,6 +21,7 @@ const ALL_CATEGORIES = [
 export default function CategoriesOnboarding() {
   const router = useRouter()
   const [selected, setSelected] = useState<string[]>([])
+  const [otherCategoryName, setOtherCategoryName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const toggleCategory = (id: string) => {
@@ -35,7 +36,10 @@ export default function CategoriesOnboarding() {
       await fetch('/api/onboarding/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categories: selected })
+        body: JSON.stringify({ 
+          categories: selected,
+          otherCategoryName: selected.includes('other') ? otherCategoryName : undefined 
+        })
       })
       router.push('/onboarding/business')
     } catch (e) {
@@ -75,6 +79,23 @@ export default function CategoriesOnboarding() {
           })}
         </div>
 
+        {selected.includes('other') && (
+          <div className="mb-8 p-6 bg-white border border-gray-200 rounded-xl shadow-sm">
+            <label htmlFor="otherCategory" className="block text-sm font-medium text-gray-700 mb-2">
+              Please specify your category
+            </label>
+            <input
+              type="text"
+              id="otherCategory"
+              value={otherCategoryName}
+              onChange={(e) => setOtherCategoryName(e.target.value)}
+              placeholder="e.g. Drones, Construction Equipment, Books..."
+              className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+            />
+          </div>
+        )}
+
         <div className="flex justify-between items-center border-t border-gray-200 pt-6">
           <button 
             onClick={() => router.push('/onboarding/business')}
@@ -84,8 +105,8 @@ export default function CategoriesOnboarding() {
           </button>
           <button 
             onClick={handleContinue}
-            disabled={isSubmitting || selected.length === 0}
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+            disabled={isSubmitting || selected.length === 0 || (selected.includes('other') && !otherCategoryName.trim())}
+            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition"
           >
             {isSubmitting ? 'Saving...' : 'Continue'}
           </button>
