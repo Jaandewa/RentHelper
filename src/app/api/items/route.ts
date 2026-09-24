@@ -104,7 +104,7 @@ export async function POST(req: Request) {
         itemImages: body.images && body.images.length > 0 ? {
           create: body.images.map((img: { url: string, caption?: string }, index: number) => ({
             url: img.url,
-            caption: img.caption || undefined,
+            caption: img.caption || null,
             fileName: img.url.split('/').pop() || 'image.jpg',
             sortOrder: index
           }))

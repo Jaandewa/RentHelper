@@ -99,16 +99,17 @@ export default function EditItemPage() {
     e.preventDefault()
     setIsLoading(true)
     try {
-      const res = await fetch('/api/items', {
-        method: 'POST',
+      const res = await fetch(`/api/items/${id}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, accessories, images }),
       })
       if (res.ok) {
         router.push('/dashboard/items')
+        router.refresh()
       } else {
         const data = await res.json()
-        alert(data.message || 'Failed to create item')
+        alert(data.message || 'Failed to update item')
       }
     } catch {
       alert('Network error')
@@ -133,29 +134,22 @@ export default function EditItemPage() {
     }
 
     try {
-      const res = await fetch(`/api/items/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...form,
-          accessories,
-          images
-        }),
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
       })
-
-      if (res.ok) {
-        router.push('/dashboard/items')
-        router.refresh()
+      const data = await res.json()
+      
+      if (res.ok && data.success && data.files) {
+        const newImages = data.files.map((f: any) => ({ url: f.url, caption: '' }))
+        setImages(prev => [...prev, ...newImages])
       } else {
-        const errorData = await res.json()
-        alert(errorData.message || 'Failed to update item')
+        alert(data.message || data.errors?.join('\n') || 'Failed to upload images')
       }
-    } catch (error) {
-      alert('An error occurred. Please try again.')
+    } catch (err: any) {
+      alert('Upload failed: ' + (err?.message || 'Network error'))
     } finally {
-      setIsLoading(false)
+      setIsUploadingImages(false)
     }
   }
 
