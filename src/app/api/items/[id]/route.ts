@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 
-export async function GET(req: Request) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -17,33 +17,26 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: 'Business not found' }, { status: 404 })
     }
 
-    const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status')
-    const categoryId = searchParams.get('categoryId')
-    const q = searchParams.get('q')
-
-    const where: any = { businessId: business.id, isActive: true }
-    if (status) where.status = status
-    if (categoryId) where.categoryId = categoryId
-    if (q) where.name = { contains: q, mode: 'insensitive' }
-
-    const items = await prisma.item.findMany({
-      where,
+    const item = await prisma.item.findUnique({
+      where: { id: params.id, businessId: business.id },
       include: {
-        category: true,
-        itemImages: { orderBy: { sortOrder: 'asc' }, take: 1 },
-      },
-      orderBy: { createdAt: 'desc' },
+        itemImages: { orderBy: { sortOrder: 'asc' } },
+        category: true
+      }
     })
 
-    return NextResponse.json(items)
+    if (!item) {
+      return NextResponse.json({ message: 'Item not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(item)
   } catch (error) {
-    console.error(error)
+    console.error('Error fetching item:', error)
     return NextResponse.json({ message: 'Server error' }, { status: 500 })
   }
 }
 
-export async function POST(req: Request) {
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
     const session = await auth()
     if (!session?.user?.id) {
@@ -56,6 +49,14 @@ export async function POST(req: Request) {
 
     if (!business) {
       return NextResponse.json({ message: 'Business not found' }, { status: 404 })
+    }
+
+    const existingItem = await prisma.item.findUnique({
+      where: { id: params.id }
+    })
+
+    if (!existingItem || existingItem.businessId !== business.id) {
+      return NextResponse.json({ message: 'Item not found or forbidden' }, { status: 404 })
     }
 
     const body = await req.json()
@@ -70,7 +71,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Name and daily rate are required' }, { status: 400 })
     }
 
-    // Find or create the category
     let category = await prisma.category.findUnique({ where: { slug: categorySlug || 'other' } })
     if (!category) {
       category = await prisma.category.create({
@@ -81,9 +81,9 @@ export async function POST(req: Request) {
       })
     }
 
-    const item = await prisma.item.create({
+    const item = await prisma.item.update({
+      where: { id: params.id },
       data: {
-        businessId: business.id,
         categoryId: category.id,
         name,
         sku,
@@ -101,20 +101,66 @@ export async function POST(req: Request) {
         replacementCost: replacementCost ? parseFloat(replacementCost) : null,
         notes,
         accessories: accessories ? JSON.stringify(accessories) : null,
-        itemImages: body.images && body.images.length > 0 ? {
-          create: body.images.map((img: { url: string, caption?: string }, index: number) => ({
-            url: img.url,
-            caption: img.caption || undefined,
-            fileName: img.url.split('/').pop() || 'image.jpg',
-            sortOrder: index
-          }))
-        } : undefined,
       }
     })
 
-    return NextResponse.json(item, { status: 201 })
+    if (body.images) {
+      await prisma.itemImage.deleteMany({ where: { itemId: params.id } })
+      if (body.images.length > 0) {
+        await prisma.itemImage.createMany({
+          data: body.images.map((img: { url: string, caption?: string }, index: number) => ({
+            itemId: params.id,
+            url: img.url,
+            caption: img.caption || null,
+            fileName: img.url.split('/').pop() || 'image.jpg',
+            sortOrder: index
+          }))
+        })
+      }
+    }
+
+    return NextResponse.json(item)
   } catch (error: any) {
-    console.error('Item save error:', error)
+    console.error('Error updating item:', error)
     return NextResponse.json({ message: `Server error: ${error?.message || 'Unknown'}` }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
+
+    const business = await prisma.business.findUnique({
+      where: { userId: session.user.id }
+    })
+
+    if (!business) {
+      return NextResponse.json({ message: 'Business not found' }, { status: 404 })
+    }
+
+    // Verify item belongs to this business
+    const item = await prisma.item.findUnique({
+      where: { id: params.id }
+    })
+
+    if (!item) {
+      return NextResponse.json({ message: 'Item not found' }, { status: 404 })
+    }
+
+    if (item.businessId !== business.id) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
+
+    await prisma.item.delete({
+      where: { id: params.id }
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting item:', error)
+    return NextResponse.json({ message: 'Server error' }, { status: 500 })
   }
 }
