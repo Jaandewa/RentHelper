@@ -17,13 +17,7 @@ const METHOD_ICONS: Record<string, string> = {
   online: '📱',
 }
 
-const mockPayments = [
-  { id: '1', bookingId: 'BK-2024-001', customer: 'Kasun Perera', type: 'advance', method: 'cash', amount: 4500, paidAt: '2024-10-23', reference: null },
-  { id: '2', bookingId: 'BK-2024-001', customer: 'Kasun Perera', type: 'deposit', method: 'bank_transfer', amount: 75000, paidAt: '2024-10-23', reference: 'TXN-98765' },
-  { id: '3', bookingId: 'BK-2024-002', customer: 'Malsha Fernando', type: 'advance', method: 'card', amount: 7350, paidAt: '2024-10-24', reference: null },
-  { id: '4', bookingId: 'BK-2024-003', customer: 'Priya Jayawardena', type: 'balance', method: 'online', amount: 12000, paidAt: '2024-10-20', reference: 'PAY-12345' },
-  { id: '5', bookingId: 'BK-2024-004', customer: 'Ravi Silva', type: 'refund', method: 'bank_transfer', amount: 20000, paidAt: '2024-10-22', reference: 'REF-54321' },
-]
+const mockPayments: any[] = []
 
 const totalIn = mockPayments.filter(p => p.type !== 'refund').reduce((a, p) => a + p.amount, 0)
 const totalOut = mockPayments.filter(p => p.type === 'refund').reduce((a, p) => a + p.amount, 0)

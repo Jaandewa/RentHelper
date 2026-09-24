@@ -9,12 +9,7 @@ const STATUS_STYLES: Record<string, string> = {
   receipt: 'bg-green-100 text-green-800',
 }
 
-const mockInvoices = [
-  { id: 'INV-001', bookingId: 'BK-2024-001', customer: 'Kasun Perera', type: 'invoice', amount: 15000, date: '2024-10-24', sentAt: '2024-10-24' },
-  { id: 'INV-002', bookingId: 'BK-2024-002', customer: 'Malsha Fernando', type: 'quotation', amount: 24500, date: '2024-10-23', sentAt: null },
-  { id: 'INV-003', bookingId: 'BK-2024-003', customer: 'Ravi Silva', type: 'receipt', amount: 12000, date: '2024-10-20', sentAt: '2024-10-20' },
-  { id: 'INV-004', bookingId: 'BK-2024-004', customer: 'Priya Jayawardena', type: 'invoice', amount: 8000, date: '2024-10-26', sentAt: null },
-]
+const mockInvoices: any[] = []
 
 export default function InvoicesPage() {
   return (

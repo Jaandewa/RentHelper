@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Users, Plus, Search, Phone, Mail, Star, ShieldCheck, ShieldAlert, Filter, Eye, Edit2, MoreVertical } from 'lucide-react'
+import { Users, Plus, Search, Phone, Mail, Star, ShieldCheck, ShieldAlert, Filter, Eye, Edit2, MoreVertical, Loader2 } from 'lucide-react'
 
 const KYC_BADGE: Record<string, { label: string; color: string }> = {
   verified: { label: 'Verified', color: 'bg-green-100 text-green-800' },
@@ -11,17 +11,8 @@ const KYC_BADGE: Record<string, { label: string; color: string }> = {
   needs_more_info: { label: 'More Info', color: 'bg-blue-100 text-blue-800' },
 }
 
-const mockCustomers = [
-  { id: '1', name: 'Kasun Perera', email: 'kasun@email.com', phone: '0771234567', nic: '9X1234567V', city: 'Colombo', kycStatus: 'verified', trustScore: 4.8, totalBookings: 12 },
-  { id: '2', name: 'Malsha Fernando', email: 'malsha@email.com', phone: '0762345678', nic: '0X234567V', city: 'Kandy', kycStatus: 'pending', trustScore: 0, totalBookings: 0 },
-  { id: '3', name: 'Ravi Silva', email: 'ravi@email.com', phone: '0753456789', nic: '8X345678V', city: 'Galle', kycStatus: 'verified', trustScore: 3.5, totalBookings: 5 },
-  { id: '4', name: 'Priya Jayawardena', email: 'priya@email.com', phone: '0774567890', nic: '9X456789V', city: 'Colombo', kycStatus: 'needs_more_info', trustScore: 0, totalBookings: 1 },
-  { id: '5', name: 'Nimal Dissanayake', email: 'nimal@email.com', phone: '0715678901', nic: '7X567890V', city: 'Matara', kycStatus: 'verified', trustScore: 5.0, totalBookings: 28 },
-  { id: '6', name: 'Dilani Gunasekara', email: 'dilani@email.com', phone: '0776789012', nic: '0X678901V', city: 'Negombo', kycStatus: 'rejected', trustScore: 0, totalBookings: 0 },
-]
-
 function TrustStars({ score }: { score: number }) {
-  if (score === 0) return <span className="text-xs text-gray-400">No ratings</span>
+  if (!score || score === 0) return <span className="text-xs text-gray-400">No ratings</span>
   return (
     <div className="flex items-center gap-1">
       <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -33,11 +24,25 @@ function TrustStars({ score }: { score: number }) {
 export default function CustomersPage() {
   const [search, setSearch] = useState('')
   const [kycFilter, setKycFilter] = useState('all')
+  const [customers, setCustomers] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const filtered = mockCustomers.filter(c => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
+  useEffect(() => {
+    setIsLoading(true)
+    fetch('/api/customers')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setCustomers(data)
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  const filtered = customers.filter(c => {
+    const matchSearch = (c.user?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.user?.email || '').toLowerCase().includes(search.toLowerCase())
     const matchKyc = kycFilter === 'all' || c.kycStatus === kycFilter
     return matchSearch && matchKyc
   })
@@ -48,7 +53,7 @@ export default function CustomersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-          <p className="text-sm text-gray-500 mt-1">{mockCustomers.length} registered customers</p>
+          <p className="text-sm text-gray-500 mt-1">{customers.length} registered customers</p>
         </div>
         <Link
           href="/dashboard/customers/new"
@@ -61,10 +66,10 @@ export default function CustomersPage() {
       {/* KYC Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total', value: mockCustomers.length, color: 'text-gray-900', bg: 'bg-white' },
-          { label: 'Verified', value: mockCustomers.filter(c => c.kycStatus === 'verified').length, color: 'text-green-700', bg: 'bg-green-50' },
-          { label: 'Pending KYC', value: mockCustomers.filter(c => c.kycStatus === 'pending').length, color: 'text-amber-700', bg: 'bg-amber-50' },
-          { label: 'Needs Action', value: mockCustomers.filter(c => c.kycStatus === 'needs_more_info' || c.kycStatus === 'rejected').length, color: 'text-red-700', bg: 'bg-red-50' },
+          { label: 'Total', value: customers.length, color: 'text-gray-900', bg: 'bg-white' },
+          { label: 'Verified', value: customers.filter(c => c.kycStatus === 'verified').length, color: 'text-green-700', bg: 'bg-green-50' },
+          { label: 'Pending KYC', value: customers.filter(c => c.kycStatus === 'pending').length, color: 'text-amber-700', bg: 'bg-amber-50' },
+          { label: 'Needs Action', value: customers.filter(c => c.kycStatus === 'needs_more_info' || c.kycStatus === 'rejected').length, color: 'text-red-700', bg: 'bg-red-50' },
         ].map(stat => (
           <div key={stat.label} className={`${stat.bg} rounded-xl border border-gray-200 shadow-sm p-4`}>
             <p className="text-sm text-gray-500">{stat.label}</p>
@@ -120,21 +125,21 @@ export default function CustomersPage() {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
-                      {customer.name.charAt(0)}
+                      {(customer.user?.name || 'U').charAt(0)}
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">{customer.name}</p>
-                      <p className="text-xs text-gray-500">{customer.city}</p>
+                      <p className="font-medium text-gray-900">{customer.user?.name || 'Unknown User'}</p>
+                      <p className="text-xs text-gray-500">{customer.city || 'No city'}</p>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="space-y-0.5">
-                    <p className="text-gray-600 flex items-center gap-1"><Phone className="w-3 h-3" /> {customer.phone}</p>
-                    <p className="text-gray-500 text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> {customer.email}</p>
+                    <p className="text-gray-600 flex items-center gap-1"><Phone className="w-3 h-3" /> {customer.emergencyPhone || 'No phone'}</p>
+                    <p className="text-gray-500 text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> {customer.user?.email}</p>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-gray-600 font-mono text-xs">{customer.nic}</td>
+                <td className="px-6 py-4 text-gray-600 font-mono text-xs">{customer.nicNumber || 'N/A'}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${KYC_BADGE[customer.kycStatus].color}`}>
                     {KYC_BADGE[customer.kycStatus].label}

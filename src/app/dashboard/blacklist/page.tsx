@@ -10,11 +10,7 @@ const SEVERITY_STYLES: Record<string, { label: string; color: string; icon: any 
   permanent: { label: 'Banned', color: 'bg-red-100 text-red-800', icon: Ban },
 }
 
-const mockBlacklist = [
-  { id: '1', customerName: 'Alex Johnson', nic: '8X001234V', reason: 'Returned item with significant damage and refused to pay', severity: 'permanent', addedDate: '2024-09-15', suspendedUntil: null, evidence: 'Photos of damage on file' },
-  { id: '2', customerName: 'Sara Lee', nic: '9X112233V', reason: 'Returned item 5 days late without communication', severity: 'warning', addedDate: '2024-10-01', suspendedUntil: null, evidence: null },
-  { id: '3', customerName: 'Tom Perera', nic: '0X998877V', reason: 'Fraudulent NIC documents submitted', severity: 'suspended', addedDate: '2024-10-10', suspendedUntil: '2025-01-10', evidence: 'Document scan on file' },
-]
+const mockBlacklist: any[] = []
 
 export default function BlacklistPage() {
   const [search, setSearch] = useState('')

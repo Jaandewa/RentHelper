@@ -17,14 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
   quotation: 'bg-indigo-400',
 }
 
-// Mock events
-const mockEvents = [
-  { id: '1', title: 'Kasun Perera — Sony A7III', start: new Date(2024, 9, 24), end: new Date(2024, 9, 26), status: 'active', bookingId: 'BK-2024-001' },
-  { id: '2', title: 'Malsha Fernando — Toyota Corolla', start: new Date(2024, 9, 25), end: new Date(2024, 9, 28), status: 'confirmed', bookingId: 'BK-2024-002' },
-  { id: '3', title: 'Ravi Silva — Tent 6x6m', start: new Date(2024, 9, 26), end: new Date(2024, 9, 27), status: 'pending_confirmation', bookingId: 'BK-2024-003' },
-  { id: '4', title: 'Nimal — Generator 5kW', start: new Date(2024, 9, 15), end: new Date(2024, 9, 17), status: 'overdue', bookingId: 'BK-2024-005' },
-  { id: '5', title: 'Priya — Canon 5D Kit', start: new Date(2024, 9, 28), end: new Date(2024, 9, 31), status: 'confirmed', bookingId: 'BK-2024-006' },
-]
+const mockEvents: any[] = []
 
 function getEventsForDay(date: Date) {
   return mockEvents.filter(ev => {

@@ -34,13 +34,7 @@ const PAYMENT_STYLES: Record<string, string> = {
   refunded: 'text-gray-500',
 }
 
-const mockBookings = [
-  { id: 'BK-2024-001', customer: 'Kasun Perera', items: ['Sony A7III', 'DJI Ronin-S'], pickupDate: '2024-10-24', returnDate: '2024-10-26', status: 'active', paymentStatus: 'paid', total: 15000, deposit: 75000 },
-  { id: 'BK-2024-002', customer: 'Malsha Fernando', items: ['Toyota Corolla'], pickupDate: '2024-10-25', returnDate: '2024-10-28', status: 'confirmed', paymentStatus: 'partially_paid', total: 24500, deposit: 100000 },
-  { id: 'BK-2024-003', customer: 'Ravi Silva', items: ['Tent 6x6m', 'PA System'], pickupDate: '2024-10-26', returnDate: '2024-10-27', status: 'pending_confirmation', paymentStatus: 'unpaid', total: 8000, deposit: 20000 },
-  { id: 'BK-2024-004', customer: 'Priya Jayawardena', items: ['Canon 5D', 'Lens Kit'], pickupDate: '2024-10-20', returnDate: '2024-10-24', status: 'returned_pending_settlement', paymentStatus: 'paid', total: 12000, deposit: 40000 },
-  { id: 'BK-2024-005', customer: 'Nimal Dissanayake', items: ['Generator 5kW'], pickupDate: '2024-10-15', returnDate: '2024-10-17', status: 'overdue', paymentStatus: 'partially_paid', total: 6000, deposit: 30000 },
-]
+const mockBookings: { id: string; customer: string; items: string[]; pickupDate: string; returnDate: string; status: string; paymentStatus: string; total: number; deposit: number }[] = []
 
 export default function BookingsPage() {
   const [activeTab, setActiveTab] = useState('all')

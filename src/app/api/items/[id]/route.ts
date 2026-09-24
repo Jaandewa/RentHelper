@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -18,7 +19,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     }
 
     const item = await prisma.item.findUnique({
-      where: { id: params.id, businessId: business.id },
+      where: { id: id, businessId: business.id },
       include: {
         itemImages: { orderBy: { sortOrder: 'asc' } },
         category: true
@@ -36,8 +37,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -52,7 +54,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     }
 
     const existingItem = await prisma.item.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     })
 
     if (!existingItem || existingItem.businessId !== business.id) {
@@ -82,7 +84,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     }
 
     const item = await prisma.item.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         categoryId: category.id,
         name,
@@ -105,11 +107,11 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     })
 
     if (body.images) {
-      await prisma.itemImage.deleteMany({ where: { itemId: params.id } })
+      await prisma.itemImage.deleteMany({ where: { itemId: id } })
       if (body.images.length > 0) {
         await prisma.itemImage.createMany({
           data: body.images.map((img: { url: string, caption?: string }, index: number) => ({
-            itemId: params.id,
+            itemId: id,
             url: img.url,
             caption: img.caption || null,
             fileName: img.url.split('/').pop() || 'image.jpg',
@@ -126,8 +128,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
@@ -143,7 +146,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
     // Verify item belongs to this business
     const item = await prisma.item.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     })
 
     if (!item) {
@@ -155,7 +158,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     }
 
     await prisma.item.delete({
-      where: { id: params.id }
+      where: { id: id }
     })
 
     return NextResponse.json({ success: true })
