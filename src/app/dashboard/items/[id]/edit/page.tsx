@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Upload, Plus, X } from 'lucide-react'
 
@@ -17,8 +17,11 @@ const CATEGORIES = [
   { slug: 'other', name: 'Other' },
 ]
 
-export default function EditItemPage({ params }: { params: { id: string } }) {
+export default function EditItemPage() {
   const router = useRouter()
+  const params = useParams()
+  const id = params.id as string
+
   const [isLoading, setIsLoading] = useState(false)
   const [isUploadingImages, setIsUploadingImages] = useState(false)
   const [images, setImages] = useState<{url: string, caption: string}[]>([])
@@ -44,7 +47,8 @@ export default function EditItemPage({ params }: { params: { id: string } }) {
   })
 
   useEffect(() => {
-    fetch(`/api/items/${params.id}`)
+    if (!id) return
+    fetch(`/api/items/${id}`)
       .then(res => res.json())
       .then(data => {
         if (data && !data.message) {
@@ -129,7 +133,7 @@ export default function EditItemPage({ params }: { params: { id: string } }) {
     }
 
     try {
-      const res = await fetch(`/api/items/${params.id}`, {
+      const res = await fetch(`/api/items/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
