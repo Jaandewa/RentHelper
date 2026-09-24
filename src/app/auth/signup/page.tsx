@@ -16,7 +16,11 @@ function SignUpContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(
+    searchParams.get('error') === 'OAuthAccountNotLinked' 
+      ? 'This email is already registered. Please sign in instead.' 
+      : ''
+  )
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
