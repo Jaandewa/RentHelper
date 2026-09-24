@@ -143,6 +143,8 @@ model CustomerProfile {
   userId                  String    @unique
   nicNumber               String?
   nicNumberEncrypted      String?
+  phone                   String?
+  phone2                  String?
   dateOfBirth             DateTime?
   emergencyContact        String?
   emergencyPhone          String?

@@ -45,10 +45,10 @@ export default function ReportsPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue (YTD)', value: `Rs. ${(totalRevenue / 1000).toFixed(0)}K`, change: '+18%', up: true, icon: DollarSign, color: 'text-green-600 bg-green-50' },
-          { label: 'Total Bookings', value: '158', change: '+12%', up: true, icon: ClipboardList, color: 'text-blue-600 bg-blue-50' },
-          { label: 'Active Customers', value: '84', change: '+24', up: true, icon: Users, color: 'text-purple-600 bg-purple-50' },
-          { label: 'Avg Utilization', value: '71%', change: '-3%', up: false, icon: Package, color: 'text-amber-600 bg-amber-50' },
+          { label: 'Total Revenue (YTD)', value: `Rs. ${(totalRevenue / 1000).toFixed(0)}K`, change: '', up: true, icon: DollarSign, color: 'text-green-600 bg-green-50' },
+          { label: 'Total Bookings', value: '0', change: '', up: true, icon: ClipboardList, color: 'text-blue-600 bg-blue-50' },
+          { label: 'Active Customers', value: '0', change: '', up: true, icon: Users, color: 'text-purple-600 bg-purple-50' },
+          { label: 'Avg Utilization', value: '0%', change: '', up: true, icon: Package, color: 'text-amber-600 bg-amber-50' },
         ].map(kpi => (
           <div key={kpi.label} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
             <div className="flex justify-between items-start mb-3">

@@ -32,6 +32,11 @@ export default middleware((req) => {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
+  // Customers should NOT access provider onboarding pages
+  if (role === 'customer' && (pathname.startsWith('/onboarding/business') || pathname.startsWith('/onboarding/categories'))) {
+    return NextResponse.redirect(new URL('/onboarding/kyc', req.url))
+  }
+
   return NextResponse.next()
 })
 
