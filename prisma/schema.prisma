@@ -226,11 +226,12 @@ model Item {
 }
 
 model ItemImage {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   itemId    String
   url       String
   fileName  String
-  sortOrder Int    @default(0)
+  caption   String?
+  sortOrder Int     @default(0)
 
   item      Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
