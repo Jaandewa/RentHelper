@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Upload, Package, Plus, X } from 'lucide-react'
+import { ArrowLeft, Upload, Plus, X } from 'lucide-react'
 
 const CATEGORIES = [
   { slug: 'camera-video', name: 'Camera & Video' },
@@ -21,7 +21,7 @@ export default function NewItemPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [isUploadingImages, setIsUploadingImages] = useState(false)
-  const [images, setImages] = useState<string[]>([])
+  const [images, setImages] = useState<{url: string, caption: string}[]>([])
   const [accessories, setAccessories] = useState<string[]>([])
   const [accessoryInput, setAccessoryInput] = useState('')
   const [form, setForm] = useState({
@@ -80,8 +80,6 @@ export default function NewItemPage() {
     }
   }
 
-  const [images, setImages] = useState<{url: string, caption: string}[]>([])
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -126,7 +124,156 @@ export default function NewItemPage() {
     })
   }
 
-  // --- Skipped to render portion ---
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/dashboard/items" className="p-2 rounded-lg text-gray-500 hover:bg-gray-100">
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Add New Item</h1>
+          <p className="text-sm text-gray-500">Add an item to your rental inventory</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basic Info */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
+              <input name="name" required value={form.name} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. Sony A7III Camera Body" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+              <select name="categorySlug" required value={form.categorySlug} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Select category</option>
+                {CATEGORIES.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SKU / Item Code</label>
+              <input name="sku" value={form.sku} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. CAM-001" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+              <input name="brand" value={form.brand} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. Sony" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+              <input name="model" value={form.model} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. ILCE-7M3" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
+              <input name="serialNumber" value={form.serialNumber} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Optional" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+              <select name="conditionGrade" value={form.conditionGrade} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="excellent">Excellent</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+                <option value="poor">Poor</option>
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea name="description" value={form.description} onChange={handleChange} rows={3}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                placeholder="Describe the item, its features and what's included..." />
+            </div>
+          </div>
+
+          {/* Accessories */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Accessories / Inclusions</label>
+            <div className="flex gap-2 mb-2">
+              <input
+                value={accessoryInput}
+                onChange={e => setAccessoryInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAccessory() } }}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. Camera strap, Battery charger..." />
+              <button type="button" onClick={addAccessory}
+                className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm hover:bg-gray-200 flex items-center gap-1">
+                <Plus className="w-4 h-4" /> Add
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {accessories.map((acc, i) => (
+                <span key={i} className="flex items-center gap-1 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
+                  {acc}
+                  <button type="button" onClick={() => removeAccessory(i)} className="hover:text-blue-900">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Pricing & Deposit</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Daily Rate (LKR) *</label>
+              <input name="dailyRate" type="number" required value={form.dailyRate} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="0.00" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Security Deposit (LKR)</label>
+              <input name="depositAmount" type="number" value={form.depositAmount} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="0.00" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Weekly Rate (LKR)</label>
+              <input name="weeklyRate" type="number" value={form.weeklyRate} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Optional discount rate" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Rate (LKR)</label>
+              <input name="monthlyRate" type="number" value={form.monthlyRate} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Optional discount rate" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buffer Time Between Rentals (hours)</label>
+              <input name="bufferHours" type="number" value={form.bufferHours} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                min="0" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Price (LKR)</label>
+              <input name="purchasePrice" type="number" value={form.purchasePrice} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="For insurance/records" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Replacement Cost (LKR)</label>
+              <input name="replacementCost" type="number" value={form.replacementCost} onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Cost if item is lost/damaged" />
+            </div>
+          </div>
+        </div>
 
         {/* Photo Upload */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
