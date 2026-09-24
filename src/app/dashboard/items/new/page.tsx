@@ -96,8 +96,8 @@ export default function NewItemPage() {
     }
 
     try {
-      // Upload directly to the external server
-      const res = await fetch('https://uploads.healingcity.lk/index.php', {
+      // Use proxy to avoid CORS issues
+      const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
@@ -107,10 +107,10 @@ export default function NewItemPage() {
         const newImages = data.files.map((f: any) => ({ url: f.url, caption: '' }))
         setImages(prev => [...prev, ...newImages])
       } else {
-        alert(data.errors?.join('\n') || data.message || 'Failed to upload images')
+        alert(data.message || data.errors?.join('\n') || 'Failed to upload images')
       }
-    } catch (err) {
-      alert('Error connecting to image server')
+    } catch (err: any) {
+      alert('Upload failed: ' + (err?.message || 'Network error'))
     } finally {
       setIsUploadingImages(false)
     }
