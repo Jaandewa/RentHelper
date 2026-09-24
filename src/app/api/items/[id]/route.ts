@@ -107,18 +107,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     })
 
     if (body.images) {
-      await prisma.itemImage.deleteMany({ where: { itemId: id } })
-      if (body.images.length > 0) {
-        await prisma.itemImage.createMany({
-          data: body.images.map((img: { url: string, caption?: string }, index: number) => ({
-            itemId: id,
-            url: img.url,
-            caption: img.caption || null,
-            fileName: img.url.split('/').pop() || 'image.jpg',
-            sortOrder: index
-          }))
-        })
-      }
+      await prisma.$transaction(async (tx) => {
+        await tx.itemImage.deleteMany({ where: { itemId: id } })
+        for (let i = 0; i < body.images.length; i++) {
+          const img = body.images[i]
+          await tx.itemImage.create({
+            data: {
+              itemId: id,
+              url: img.url,
+              caption: img.caption || null,
+              fileName: img.url.split('/').pop() || 'image.jpg',
+              sortOrder: i,
+            }
+          })
+        }
+      })
     }
 
     return NextResponse.json(item)
