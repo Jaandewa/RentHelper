@@ -5,30 +5,19 @@ import { BarChart3, TrendingUp, TrendingDown, Package, Users, ClipboardList, Dol
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-const revenueData = [185000, 220000, 198000, 340000, 290000, 415000, 380000, 520000, 460000, 425000, 0, 0]
+const revenueData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-const topItems = [
-  { name: 'Sony A7III Camera', bookings: 42, revenue: 210000, utilization: 87 },
-  { name: 'Toyota Corolla 2022', bookings: 28, revenue: 224000, utilization: 72 },
-  { name: 'Tent 6x6m', bookings: 35, revenue: 122500, utilization: 65 },
-  { name: 'DJI Ronin-S Gimbal', bookings: 38, revenue: 95000, utilization: 79 },
-  { name: 'Aputure 120D Light', bookings: 31, revenue: 46500, utilization: 54 },
-]
+const topItems: any[] = []
 
-const categoryData = [
-  { name: 'Camera & Video', value: 42, color: '#3b82f6' },
-  { name: 'Vehicles', value: 28, color: '#8b5cf6' },
-  { name: 'Party & Events', value: 35, color: '#f59e0b' },
-  { name: 'Tools & Equipment', value: 15, color: '#10b981' },
-  { name: 'Other', value: 8, color: '#6b7280' },
-]
+const categoryData: any[] = []
 
 export default function ReportsPage() {
   const [period, setPeriod] = useState('month')
-  const maxRevenue = Math.max(...revenueData)
+  const maxRevenue = Math.max(...revenueData, 0)
 
   const totalRevenue = revenueData.reduce((a, b) => a + b, 0)
-  const avgMonthly = Math.round(totalRevenue / revenueData.filter(v => v > 0).length)
+  const activeMonths = revenueData.filter(v => v > 0).length
+  const avgMonthly = activeMonths > 0 ? Math.round(totalRevenue / activeMonths) : 0
 
   return (
     <div className="space-y-6">
