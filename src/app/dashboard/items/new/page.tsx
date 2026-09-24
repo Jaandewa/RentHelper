@@ -96,8 +96,8 @@ export default function NewItemPage() {
     }
 
     try {
-      // Proxy through Next.js to bypass CORS issues on the external server
-      const res = await fetch('/api/upload', {
+      // Upload directly to the external server
+      const res = await fetch('https://uploads.healingcity.lk/index.php', {
         method: 'POST',
         body: formData,
       })

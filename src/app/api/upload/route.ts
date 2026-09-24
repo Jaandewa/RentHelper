@@ -11,13 +11,15 @@ export async function POST(req: Request) {
     })
 
     if (!response.ok) {
-      return NextResponse.json({ message: 'External server error' }, { status: response.status })
+      const errorText = await response.text()
+      console.error('PHP Server Error:', response.status, errorText)
+      return NextResponse.json({ message: `External server error: ${response.status} - ${errorText.substring(0, 100)}` }, { status: response.status })
     }
 
     const data = await response.json()
     return NextResponse.json(data)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Upload error:', error)
-    return NextResponse.json({ message: 'Error uploading image' }, { status: 500 })
+    return NextResponse.json({ message: `Error uploading image: ${error.message}` }, { status: 500 })
   }
 }

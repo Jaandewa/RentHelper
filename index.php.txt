@@ -1,0 +1,79 @@
+<?php
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+header('Content-Type: application/json');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    exit();
+}
+
+$uploadDir = __DIR__ . '/uploads/';
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0755, true);
+}
+
+// Support both 'images[]' and 'images' field names
+$files = [];
+if (isset($_FILES['images'])) {
+    $files = $_FILES['images'];
+} elseif (isset($_FILES['images[]'])) {
+    $files = $_FILES['images[]'];
+}
+
+if (empty($files) || empty($files['name'][0])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'No files uploaded']);
+    exit();
+}
+
+$uploadedFiles = [];
+$errors = [];
+
+// Convert $_FILES array format to a more manageable structure
+$fileCount = count($files['name']);
+for ($i = 0; $i < $fileCount; $i++) {
+    $fileName = basename($files['name'][$i]);
+    $tmpName = $files['tmp_name'][$i];
+    $error = $files['error'][$i];
+    $size = $files['size'][$i];
+    
+    if ($error === UPLOAD_ERR_OK) {
+        $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
+        
+        if (!in_array($fileExt, $allowedExts)) {
+            $errors[] = "$fileName: Invalid file type.";
+            continue;
+        }
+        
+        $newFileName = uniqid() . '_' . time() . '.' . $fileExt;
+        $destination = $uploadDir . $newFileName;
+        
+        if (move_uploaded_file($tmpName, $destination)) {
+            $uploadedFiles[] = [
+                'url' => 'https://uploads.healingcity.lk/uploads/' . $newFileName,
+                'name' => $fileName
+            ];
+        } else {
+            $errors[] = "$fileName: Failed to move file.";
+        }
+    } else {
+        $errors[] = "$fileName: Upload error code $error.";
+    }
+}
+
+if (empty($uploadedFiles)) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Failed to upload any files', 'errors' => $errors]);
+} else {
+    http_response_code(200);
+    echo json_encode(['success' => true, 'files' => $uploadedFiles, 'errors' => $errors]);
+}
