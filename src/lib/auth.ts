@@ -21,7 +21,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           response_type: "code",
           scope: "openid email profile https://www.googleapis.com/auth/calendar.events"
         }
-      }
+      },
+      allowDangerousEmailAccountLinking: true,
     }),
     Credentials({
       name: 'Credentials',
@@ -42,20 +43,89 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     })
   ],
   callbacks: {
-    ...authConfig.callbacks,
-    async signIn({ user, account, profile }) {
+    async jwt({ token, user, account, trigger }) {
+      if (account?.provider === 'google') {
+        token.access_token = account.access_token
+        token.refresh_token = account.refresh_token
+      }
+      if (user) {
+        token.id = user.id
+        token.role = (user as any).role || 'customer'
+      }
+      // Refetch role from DB on signIn to pick up role set by createUser event
+      if (trigger === 'signIn' && token.id) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true }
+          })
+          if (dbUser) token.role = dbUser.role
+        } catch {}
+      }
+      return token
+    },
+    async session({ session, token }: any) {
+      if (session.user) {
+        session.user.id = token.id as string
+        session.user.role = (token.role as string) || 'customer'
+      }
+      return session
+    },
+    async signIn({ user, account }) {
       if (account?.provider === 'google') {
         const existingUser = await prisma.user.findUnique({
-          where: { email: user.email! }
+          where: { email: user.email! },
+          include: { businessProfile: true, customerProfile: true }
         })
-        
-        if (!existingUser) {
-           const cookieStore = await cookies();
-           const pendingRole = cookieStore.get('pendingRole')?.value;
-           ;(user as any).role = pendingRole || 'customer';
+
+        if (existingUser) {
+          // Existing user — ensure they have role-specific profile
+          if (existingUser.role === 'provider' && !existingUser.businessProfile) {
+            const siteSettings = await prisma.siteSettings.findUnique({ where: { id: '1' } })
+            const trialDays = siteSettings?.defaultTrialDays ?? 30
+            const trialEndsAt = new Date()
+            trialEndsAt.setDate(trialEndsAt.getDate() + trialDays)
+            const slug = `${(existingUser.name || 'business').toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
+            const business = await prisma.business.create({
+              data: { userId: existingUser.id, name: existingUser.name || 'My Business', slug, approvalStatus: 'approved' },
+            })
+            await prisma.subscription.create({
+              data: { businessId: business.id, status: 'trial', planName: 'Free Trial', pricePerMonth: 0, maxItems: 5, trialEndsAt },
+            })
+          } else if (existingUser.role === 'customer' && !existingUser.customerProfile) {
+            await prisma.customerProfile.create({ data: { userId: existingUser.id } })
+          }
         }
       }
       return true
-    }
-  }
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      // Fires when PrismaAdapter creates a NEW user via Google OAuth
+      const cookieStore = await cookies()
+      const pendingRole = cookieStore.get('pendingRole')?.value || 'customer'
+
+      await prisma.user.update({
+        where: { id: user.id! },
+        data: { role: pendingRole },
+      })
+
+      if (pendingRole === 'provider') {
+        const siteSettings = await prisma.siteSettings.findUnique({ where: { id: '1' } })
+        const trialDays = siteSettings?.defaultTrialDays ?? 30
+        const trialEndsAt = new Date()
+        trialEndsAt.setDate(trialEndsAt.getDate() + trialDays)
+        const slug = `${(user.name || 'business').toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
+        const business = await prisma.business.create({
+          data: { userId: user.id!, name: user.name || 'My Business', slug, approvalStatus: 'approved' },
+        })
+        await prisma.subscription.create({
+          data: { businessId: business.id, status: 'trial', planName: 'Free Trial', pricePerMonth: 0, maxItems: 5, trialEndsAt },
+        })
+      } else {
+        await prisma.customerProfile.create({ data: { userId: user.id! } })
+      }
+    },
+  },
 })
