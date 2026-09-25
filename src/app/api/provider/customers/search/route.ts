@@ -27,13 +27,12 @@ export async function GET(req: NextRequest) {
     })
 
     const cleanSearch = q.toLowerCase().replace(/^cus-/, '')
-    // Phone normalization variant
     const digitsOnly = q.replace(/[^0-9]/g, '')
     const phoneVariant = digitsOnly.length >= 9 ? digitsOnly.slice(-9) : digitsOnly
 
     const where: any = {
       user: {
-        role: 'customer',
+        role: { in: ['customer', 'CUSTOMER', 'Customer'] },
       },
     }
 
@@ -47,7 +46,6 @@ export async function GET(req: NextRequest) {
 
       where.OR = [
         { allowCrossProviderShare: true },
-        { allowCrossProviderShare: null },
         { id: { in: existingCustomerIds } },
       ]
     }

@@ -8,6 +8,32 @@ export function getCustomerDisplayId(id: string): string {
   return `CUS-${suffix}`
 }
 
+async function ensureCustomerProfilesExist() {
+  try {
+    const customerUsersWithoutProfile = await prisma.user.findMany({
+      where: {
+        role: { in: ['customer', 'CUSTOMER', 'Customer'] },
+        customerProfile: { is: null },
+      },
+      select: { id: true },
+    })
+
+    if (customerUsersWithoutProfile.length > 0) {
+      await prisma.customerProfile.createMany({
+        data: customerUsersWithoutProfile.map(u => ({
+          userId: u.id,
+          kycStatus: 'not_submitted',
+          accountStatus: 'incomplete',
+          allowCrossProviderShare: true,
+        })),
+        skipDuplicates: true,
+      })
+    }
+  } catch (err) {
+    console.error('Error auto-creating customer profiles:', err)
+  }
+}
+
 // GET /api/provider/customers — List registered customers discoverable by provider
 export async function GET(req: NextRequest) {
   try {
@@ -21,6 +47,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Forbidden — Providers only' }, { status: 403 })
     }
 
+    await ensureCustomerProfilesExist()
+
     const business = await prisma.business.findFirst({
       where: { userId: session.user.id },
     })
@@ -32,10 +60,10 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50', 10)
     const skip = (page - 1) * limit
 
-    // Base query: registered customer role users only
+    // Base query: registered customer role users only (case-insensitive role check)
     const where: any = {
       user: {
-        role: 'customer',
+        role: { in: ['customer', 'CUSTOMER', 'Customer'] },
       },
     }
 
@@ -50,7 +78,6 @@ export async function GET(req: NextRequest) {
 
       where.OR = [
         { allowCrossProviderShare: true },
-        { allowCrossProviderShare: null },
         { id: { in: existingCustomerIds } },
       ]
     }
@@ -58,7 +85,6 @@ export async function GET(req: NextRequest) {
     // Search filter
     if (search) {
       const normalizedSearch = search.toLowerCase()
-      // Strip CUS- if search is a display ID
       const cleanSearch = normalizedSearch.replace(/^cus-/, '')
 
       where.AND = [

@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 
     const where: any = {
       user: {
-        role: 'customer',
+        role: { in: ['customer', 'CUSTOMER', 'Customer'] },
       }
     }
 
@@ -34,7 +34,6 @@ export async function GET(req: Request) {
 
       where.OR = [
         { allowCrossProviderShare: true },
-        { allowCrossProviderShare: null },
         { id: { in: existingCustomerIds } },
       ]
     }
@@ -140,11 +139,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Name, email and phone number are required' }, { status: 400 })
     }
 
-    // Check if user with this email exists
     let user = await prisma.user.findUnique({ where: { email } })
 
     if (!user) {
-      // Create a new user account for the customer
       user = await prisma.user.create({
         data: {
           name,
@@ -154,7 +151,6 @@ export async function POST(req: Request) {
       })
     }
 
-    // Check if customer profile exists
     let customerProfile = await prisma.customerProfile.findUnique({
       where: { userId: user.id }
     })
