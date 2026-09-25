@@ -30,6 +30,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         })
         .catch(() => {})
     }
+
+    // Block customers with pending/rejected KYC from dashboard
+    if (session?.user?.role === 'customer') {
+      fetch('/api/auth/me')
+        .then(r => r.json())
+        .then(d => {
+          const kycStatus = d.user?.customerProfile?.kycStatus
+          if (kycStatus !== 'verified') {
+            window.location.href = '/customer/pending-approval'
+          }
+        })
+        .catch(() => {})
+    }
   }, [session])
 
   const navGroups = [

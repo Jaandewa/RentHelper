@@ -1,13 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Phone, User, MapPin, Shield, Upload, FileText } from 'lucide-react'
+import { Phone, User, Shield, FileText, Upload, X, CheckCircle, Loader2 } from 'lucide-react'
 
 export default function KYCOnboarding() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [success, setSuccess] = useState(false)
   const [formData, setFormData] = useState({
     fullName: '',
     nicNumber: '',
@@ -22,25 +21,94 @@ export default function KYCOnboarding() {
     consent: false,
   })
 
+  // Photo upload state
+  const [nicFrontUrl, setNicFrontUrl] = useState<string | null>(null)
+  const [nicBackUrl, setNicBackUrl] = useState<string | null>(null)
+  const [selfieUrl, setSelfieUrl] = useState<string | null>(null)
+  const [nicFrontName, setNicFrontName] = useState<string | null>(null)
+  const [nicBackName, setNicBackName] = useState<string | null>(null)
+  const [selfieName, setSelfieName] = useState<string | null>(null)
+  const [uploading, setUploading] = useState<string | null>(null) // 'front' | 'back' | 'selfie' | null
+
+  const frontRef = useRef<HTMLInputElement>(null)
+  const backRef = useRef<HTMLInputElement>(null)
+  const selfieRef = useRef<HTMLInputElement>(null)
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  const uploadFile = async (file: File, type: 'front' | 'back' | 'selfie') => {
+    setUploading(type)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) throw new Error('Upload failed')
+      const data = await res.json()
+      const url = data.url || data.fileUrl
+
+      if (type === 'front') {
+        setNicFrontUrl(url)
+        setNicFrontName(file.name)
+      } else if (type === 'back') {
+        setNicBackUrl(url)
+        setNicBackName(file.name)
+      } else {
+        setSelfieUrl(url)
+        setSelfieName(file.name)
+      }
+    } catch (err) {
+      alert(`Failed to upload ${type} photo. Please try again.`)
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back' | 'selfie') => {
+    const file = e.target.files?.[0]
+    if (file) uploadFile(file, type)
+  }
+
+  const removeFile = (type: 'front' | 'back' | 'selfie') => {
+    if (type === 'front') { setNicFrontUrl(null); setNicFrontName(null); if (frontRef.current) frontRef.current.value = '' }
+    if (type === 'back') { setNicBackUrl(null); setNicBackName(null); if (backRef.current) backRef.current.value = '' }
+    if (type === 'selfie') { setSelfieUrl(null); setSelfieName(null); if (selfieRef.current) selfieRef.current.value = '' }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!nicFrontUrl || !nicBackUrl) {
+      alert('Please upload both front and back photos of your ID document.')
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
       const res = await fetch('/api/kyc/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          nicFrontUrl,
+          nicBackUrl,
+          selfieUrl,
+          nicFrontName,
+          nicBackName,
+          selfieName,
+        }),
       })
 
       if (res.ok) {
-        setSuccess(true)
-        setTimeout(() => router.push('/dashboard'), 2000)
+        router.push('/customer/pending-approval')
       } else {
         const data = await res.json()
         alert(data.message || 'Failed to submit KYC')
@@ -52,17 +120,44 @@ export default function KYCOnboarding() {
     }
   }
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm text-center">
-          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">✓</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Documents Submitted!</h2>
-          <p className="text-gray-600">Our team will review your submission within 24 hours. You&apos;ll receive a notification once verified.</p>
+  const FileUploadBox = ({ label, required, type, url, name, uploading: isUploading, inputRef }: {
+    label: string; required?: boolean; type: 'front' | 'back' | 'selfie';
+    url: string | null; name: string | null; uploading: boolean; inputRef: React.RefObject<HTMLInputElement | null>
+  }) => (
+    <div className="col-span-2">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        {label} {required && '*'} {!required && <span className="text-gray-400">(Optional)</span>}
+      </label>
+      {url ? (
+        <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-green-800 truncate">{name}</p>
+            <p className="text-xs text-green-600">Uploaded successfully</p>
+          </div>
+          <button type="button" onClick={() => removeFile(type)} className="text-gray-400 hover:text-red-500">
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      </div>
-    )
-  }
+      ) : isUploading ? (
+        <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+          <p className="text-sm text-blue-700">Uploading...</p>
+        </div>
+      ) : (
+        <div 
+          onClick={() => inputRef.current?.click()}
+          className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+        >
+          <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+          <p className="text-sm text-gray-600">Click to upload</p>
+          <p className="text-xs text-gray-400 mt-1">JPG, PNG up to 10MB</p>
+          <input ref={inputRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => handleFileChange(e, type)} />
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -123,7 +218,6 @@ export default function KYCOnboarding() {
                   placeholder="e.g. 0771234567"
                   className="block w-full border border-gray-300 rounded-lg py-2.5 px-3 text-sm focus:ring-blue-500 focus:border-blue-500" />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Secondary Contact Number <span className="text-gray-400">(Optional)</span></label>
                 <input type="tel" name="phone2" value={formData.phone2} onChange={handleChange}
@@ -144,7 +238,6 @@ export default function KYCOnboarding() {
                 <input required type="text" name="emergencyContact" value={formData.emergencyContact} onChange={handleChange}
                   className="block w-full border border-gray-300 rounded-lg py-2.5 px-3 text-sm focus:ring-blue-500 focus:border-blue-500" />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Emergency Contact Phone *</label>
                 <input required type="tel" name="emergencyPhone" value={formData.emergencyPhone} onChange={handleChange}
@@ -170,23 +263,17 @@ export default function KYCOnboarding() {
                 </select>
               </div>
 
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Upload Front Side *</label>
-                <input required type="file" accept="image/*"
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-              </div>
+              <FileUploadBox label="Upload Front Side" required type="front"
+                url={nicFrontUrl} name={nicFrontName}
+                uploading={uploading === 'front'} inputRef={frontRef} />
 
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Upload Back Side *</label>
-                <input required type="file" accept="image/*"
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-              </div>
+              <FileUploadBox label="Upload Back Side" required type="back"
+                url={nicBackUrl} name={nicBackName}
+                uploading={uploading === 'back'} inputRef={backRef} />
 
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Selfie with ID <span className="text-gray-400">(Optional)</span></label>
-                <input type="file" accept="image/*"
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-              </div>
+              <FileUploadBox label="Selfie with ID" type="selfie"
+                url={selfieUrl} name={selfieName}
+                uploading={uploading === 'selfie'} inputRef={selfieRef} />
             </div>
           </div>
 
@@ -202,7 +289,7 @@ export default function KYCOnboarding() {
           </div>
 
           <div className="flex justify-end pt-6 border-t border-gray-200">
-            <button type="submit" disabled={isSubmitting}
+            <button type="submit" disabled={isSubmitting || uploading !== null}
               className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
               {isSubmitting ? 'Submitting...' : 'Submit Verification'}
             </button>
