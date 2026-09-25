@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Package, Plus, Search, Grid, List, Filter, Edit2, Trash2, Eye, Loader2, Megaphone } from 'lucide-react'
+import { Package, Plus, Search, Grid, List, Edit2, Trash2, Eye, Loader2, Megaphone, ExternalLink, EyeOff } from 'lucide-react'
 import Image from 'next/image'
+
+type AdPostState = 'idle' | 'posting' | 'posted' | 'error'
 
 const STATUS_COLORS: Record<string, string> = {
   available: 'bg-green-100 text-green-800',
@@ -28,6 +30,7 @@ export default function ItemsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [items, setItems] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [adPostStates, setAdPostStates] = useState<Record<string, { state: AdPostState; message?: string }>>({})
 
   const fetchItems = async () => {
     setIsLoading(true)
@@ -58,16 +61,20 @@ export default function ItemsPage() {
       } else {
         alert('Failed to delete item')
       }
-    } catch (err) {
+    } catch {
       alert('Error deleting item')
     }
   }
 
-  const handlePostAsAd = async (item: any) => {
-    if (item.rentalAd) {
-      window.open(`/marketplace/${item.rentalAd.id}`, '_blank')
-      return
-    }
+  const handlePostAd = async (item: any) => {
+    const currentState = adPostStates[item.id]?.state
+    if (currentState === 'posting') return // Prevent duplicate clicks
+
+    setAdPostStates(prev => ({
+      ...prev,
+      [item.id]: { state: 'posting' }
+    }))
+
     try {
       const res = await fetch('/api/provider/ads', {
         method: 'POST',
@@ -84,19 +91,45 @@ export default function ItemsPage() {
           securityDeposit: item.depositAmount,
           coverImageUrl: item.itemImages?.[0]?.url || '',
           galleryImages: item.itemImages?.map((img: any) => img.url) || [],
+          isPublished: true,
         }),
       })
+
       if (res.ok) {
-        const data = await res.json()
-        await fetch(`/api/provider/ads/${data.ad?.id || data.id}/publish`, { method: 'POST' })
-        alert('Item posted as ad on marketplace! 🎉')
-        fetchItems()
+        setAdPostStates(prev => ({
+          ...prev,
+          [item.id]: { state: 'posted' }
+        }))
+        await fetchItems()
       } else {
         const err = await res.json()
-        alert(err.message || 'Failed to create ad')
+        setAdPostStates(prev => ({
+          ...prev,
+          [item.id]: { state: 'error', message: err.error || err.message || 'Failed to post ad. Please try again.' }
+        }))
       }
     } catch {
-      alert('Failed to post as ad')
+      setAdPostStates(prev => ({
+        ...prev,
+        [item.id]: { state: 'error', message: 'Failed to post ad. Please try again.' }
+      }))
+    }
+  }
+
+  const handleUnpublishAd = async (adId: string, itemId: string) => {
+    try {
+      const res = await fetch(`/api/provider/ads/${adId}/unpublish`, { method: 'POST' })
+      if (res.ok) {
+        setAdPostStates(prev => ({
+          ...prev,
+          [itemId]: { state: 'idle' }
+        }))
+        await fetchItems()
+      } else {
+        alert('Failed to unpublish ad')
+      }
+    } catch {
+      alert('Failed to unpublish ad')
     }
   }
 
@@ -177,53 +210,117 @@ export default function ItemsPage() {
           {/* Items Grid */}
           {view === 'grid' ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filtered.map(item => (
-                <div key={item.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
-                    {item.itemImages && item.itemImages.length > 0 ? (
-                      <Image src={item.itemImages[0].url} alt={item.name} fill className="object-cover" unoptimized />
-                    ) : (
-                      <Package className="w-12 h-12 text-gray-400" />
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate pr-2">{item.name}</h3>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full shrink-0 ${STATUS_COLORS[item.status]}`}>
-                        {item.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-1">{item.sku || 'No SKU'} · {item.category?.name}</p>
-                    <p className={`text-xs font-medium mb-3 ${CONDITION_COLORS[item.conditionGrade || 'good']}`}>
-                      {(item.conditionGrade || 'good').charAt(0).toUpperCase() + (item.conditionGrade || 'good').slice(1)} condition
-                    </p>
-                    <div className="flex justify-between items-center mt-4">
-                      <div>
-                        <p className="text-lg font-bold text-gray-900">Rs. {item.dailyRate.toLocaleString()}</p>
-                        <p className="text-xs text-gray-500">per day</p>
+              {filtered.map(item => {
+                const itemAdState = adPostStates[item.id]?.state || (item.rentalAd?.isPublished ? 'posted' : 'idle')
+                const errorMessage = adPostStates[item.id]?.message
+                const isPosting = itemAdState === 'posting'
+                const isPosted = itemAdState === 'posted' || item.rentalAd?.isPublished
+
+                return (
+                  <div key={item.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col justify-between">
+                    <div>
+                      <div className="h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
+                        {item.itemImages && item.itemImages.length > 0 ? (
+                          <Image src={item.itemImages[0].url} alt={item.name} fill className="object-cover" unoptimized />
+                        ) : (
+                          <Package className="w-12 h-12 text-gray-400" />
+                        )}
                       </div>
-                      <div className="flex gap-1">
-                        <Link href={`/dashboard/items/${item.id}`} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                        <Link href={`/dashboard/items/${item.id}/edit`} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
-                          <Edit2 className="w-4 h-4" />
-                        </Link>
+                      <div className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate pr-2">{item.name}</h3>
+                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full shrink-0 ${STATUS_COLORS[item.status]}`}>
+                            {item.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-1">{item.sku || 'No SKU'} · {item.category?.name}</p>
+                        <p className={`text-xs font-medium mb-3 ${CONDITION_COLORS[item.conditionGrade || 'good']}`}>
+                          {(item.conditionGrade || 'good').charAt(0).toUpperCase() + (item.conditionGrade || 'good').slice(1)} condition
+                        </p>
+                        <div className="flex justify-between items-center mb-3">
+                          <div>
+                            <p className="text-lg font-bold text-gray-900">Rs. {item.dailyRate.toLocaleString()}</p>
+                            <p className="text-xs text-gray-500">per day</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Link href={`/dashboard/items/${item.id}`} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="View details">
+                              <Eye className="w-4 h-4" />
+                            </Link>
+                            <Link href={`/dashboard/items/${item.id}/edit`} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors" title="Edit item">
+                              <Edit2 className="w-4 h-4" />
+                            </Link>
+                            <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete item">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Post Ad Footer */}
+                    <div className="p-3 bg-gray-50 border-t border-gray-100 flex flex-col gap-2">
+                      {errorMessage && (
+                        <p className="text-xs text-red-600 font-medium">{errorMessage}</p>
+                      )}
+
+                      <div className="flex items-center justify-between gap-2">
                         <button
-                          onClick={() => handlePostAsAd(item)}
-                          className={`p-1.5 rounded-lg transition-colors ${item.rentalAd?.isPublished ? 'text-green-500 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
-                          title={item.rentalAd?.isPublished ? 'View Ad' : 'Post as Ad'}
+                          type="button"
+                          onClick={() => handlePostAd(item)}
+                          disabled={isPosting || isPosted}
+                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                            isPosting
+                              ? 'bg-purple-100 text-purple-700 cursor-not-allowed'
+                              : isPosted
+                              ? 'bg-green-100 text-green-800 cursor-default'
+                              : itemAdState === 'error'
+                              ? 'bg-red-600 text-white hover:bg-red-700'
+                              : 'bg-purple-600 text-white hover:bg-purple-700 shadow-xs'
+                          }`}
                         >
-                          <Megaphone className="w-4 h-4" />
+                          {isPosting ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Posting Ad...</span>
+                            </>
+                          ) : isPosted ? (
+                            <>
+                              <Megaphone className="w-3.5 h-3.5" />
+                              <span>Ad Posted</span>
+                            </>
+                          ) : (
+                            <>
+                              <Megaphone className="w-3.5 h-3.5" />
+                              <span>📢 Post Ad</span>
+                            </>
+                          )}
                         </button>
-                        <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+
+                        {isPosted && item.rentalAd && (
+                          <div className="flex gap-1">
+                            <Link
+                              href={`/marketplace/${item.rentalAd.id}`}
+                              target="_blank"
+                              className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                              title="View Public Ad"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleUnpublishAd(item.rentalAd.id, item.id)}
+                              className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-600 hover:text-red-600 hover:border-red-300 transition-colors"
+                              title="Unpublish Ad"
+                            >
+                              <EyeOff className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -236,61 +333,95 @@ export default function ItemsPage() {
                       <th className="px-6 py-3">Status</th>
                       <th className="px-6 py-3">Condition</th>
                       <th className="px-6 py-3">Daily Rate</th>
-                      <th className="px-6 py-3">Deposit</th>
+                      <th className="px-6 py-3">Marketplace Ad</th>
                       <th className="px-6 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm">
-                    {filtered.map(item => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center relative overflow-hidden shrink-0">
-                              {item.itemImages && item.itemImages.length > 0 ? (
-                                <Image src={item.itemImages[0].url} alt={item.name} fill className="object-cover" unoptimized />
-                              ) : (
-                                <Package className="w-5 h-5 text-gray-400" />
-                              )}
+                    {filtered.map(item => {
+                      const itemAdState = adPostStates[item.id]?.state || (item.rentalAd?.isPublished ? 'posted' : 'idle')
+                      const isPosting = itemAdState === 'posting'
+                      const isPosted = itemAdState === 'posted' || item.rentalAd?.isPublished
+
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center relative overflow-hidden shrink-0">
+                                {item.itemImages && item.itemImages.length > 0 ? (
+                                  <Image src={item.itemImages[0].url} alt={item.name} fill className="object-cover" unoptimized />
+                                ) : (
+                                  <Package className="w-5 h-5 text-gray-400" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{item.name}</p>
+                                <p className="text-xs text-gray-500">{item.sku || 'No SKU'}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium text-gray-900">{item.name}</p>
-                              <p className="text-xs text-gray-500">{item.sku || 'No SKU'}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-gray-600">{item.category?.name}</td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${STATUS_COLORS[item.status]}`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className={`px-6 py-4 font-medium ${CONDITION_COLORS[item.conditionGrade || 'good']}`}>
-                          {(item.conditionGrade || 'good').charAt(0).toUpperCase() + (item.conditionGrade || 'good').slice(1)}
-                        </td>
-                        <td className="px-6 py-4 font-medium whitespace-nowrap">Rs. {item.dailyRate.toLocaleString()}</td>
-                        <td className="px-6 py-4 text-gray-600 whitespace-nowrap">Rs. {item.depositAmount?.toLocaleString() || '0'}</td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Link href={`/dashboard/items/${item.id}`} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                              <Eye className="w-4 h-4" />
-                            </Link>
-                            <Link href={`/dashboard/items/${item.id}/edit`} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
-                              <Edit2 className="w-4 h-4" />
-                            </Link>
+                          </td>
+                          <td className="px-6 py-4 text-gray-600">{item.category?.name}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${STATUS_COLORS[item.status]}`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className={`px-6 py-4 font-medium ${CONDITION_COLORS[item.conditionGrade || 'good']}`}>
+                            {(item.conditionGrade || 'good').charAt(0).toUpperCase() + (item.conditionGrade || 'good').slice(1)}
+                          </td>
+                          <td className="px-6 py-4 font-medium whitespace-nowrap">Rs. {item.dailyRate.toLocaleString()}</td>
+                          <td className="px-6 py-4">
                             <button
-                              onClick={() => handlePostAsAd(item)}
-                              className={`p-1.5 rounded-lg transition-colors ${item.rentalAd?.isPublished ? 'text-green-500 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
-                              title={item.rentalAd?.isPublished ? 'View Ad' : 'Post as Ad'}
+                              type="button"
+                              onClick={() => handlePostAd(item)}
+                              disabled={isPosting || isPosted}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                                isPosting
+                                  ? 'bg-purple-100 text-purple-700 cursor-not-allowed'
+                                  : isPosted
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-purple-600 text-white hover:bg-purple-700'
+                              }`}
                             >
-                              <Megaphone className="w-4 h-4" />
+                              {isPosting ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Posting Ad...</span>
+                                </>
+                              ) : isPosted ? (
+                                <>
+                                  <Megaphone className="w-3.5 h-3.5" />
+                                  <span>Ad Posted</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Megaphone className="w-3.5 h-3.5" />
+                                  <span>📢 Post Ad</span>
+                                </>
+                              )}
                             </button>
-                            <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              {isPosted && item.rentalAd && (
+                                <Link href={`/marketplace/${item.rentalAd.id}`} target="_blank" className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors" title="View Public Ad">
+                                  <ExternalLink className="w-4 h-4" />
+                                </Link>
+                              )}
+                              <Link href={`/dashboard/items/${item.id}`} className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="View Details">
+                                <Eye className="w-4 h-4" />
+                              </Link>
+                              <Link href={`/dashboard/items/${item.id}/edit`} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors" title="Edit Item">
+                                <Edit2 className="w-4 h-4" />
+                              </Link>
+                              <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete Item">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

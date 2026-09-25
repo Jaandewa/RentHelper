@@ -1,32 +1,102 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Edit2, Package, Tag, Clock, FileText, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Edit2, Package, Tag, FileText, CheckCircle2, Megaphone, Loader2, ExternalLink, EyeOff } from 'lucide-react'
+
+type AdPostState = 'idle' | 'posting' | 'posted' | 'error'
 
 export default function ItemViewPage() {
   const params = useParams()
   const id = params.id as string
   const [item, setItem] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [adState, setAdState] = useState<AdPostState>('idle')
+  const [adErrorMessage, setAdErrorMessage] = useState<string | null>(null)
+
+  const fetchItemDetails = async () => {
+    try {
+      const res = await fetch(`/api/items/${id}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (!data.message) {
+          setItem(data)
+          if (data.rentalAd?.isPublished) {
+            setAdState('posted')
+          }
+        }
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!id) return
-    fetch(`/api/items/${id}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!data.message) {
-          setItem(data)
-        }
-      })
-      .finally(() => setLoading(false))
+    fetchItemDetails()
   }, [id])
+
+  const handlePostAd = async () => {
+    if (adState === 'posting') return // Prevent duplicate clicks
+    setAdState('posting')
+    setAdErrorMessage(null)
+
+    try {
+      const res = await fetch('/api/provider/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemId: item.id,
+          title: item.name,
+          description: item.description || '',
+          city: '',
+          dailyPrice: item.dailyRate,
+          hourlyPrice: item.hourlyRate,
+          weeklyPrice: item.weeklyRate,
+          monthlyPrice: item.monthlyRate,
+          securityDeposit: item.depositAmount,
+          coverImageUrl: item.itemImages?.[0]?.url || '',
+          galleryImages: item.itemImages?.map((img: any) => img.url) || [],
+          isPublished: true,
+        }),
+      })
+
+      if (res.ok) {
+        setAdState('posted')
+        await fetchItemDetails()
+      } else {
+        const err = await res.json()
+        setAdState('error')
+        setAdErrorMessage(err.error || err.message || 'Failed to post ad. Please try again.')
+      }
+    } catch {
+      setAdState('error')
+      setAdErrorMessage('Failed to post ad. Please try again.')
+    }
+  }
+
+  const handleUnpublishAd = async () => {
+    if (!item.rentalAd?.id) return
+    try {
+      const res = await fetch(`/api/provider/ads/${item.rentalAd.id}/unpublish`, { method: 'POST' })
+      if (res.ok) {
+        setAdState('idle')
+        await fetchItemDetails()
+      } else {
+        alert('Failed to unpublish ad')
+      }
+    } catch {
+      alert('Failed to unpublish ad')
+    }
+  }
 
   if (loading) return <div className="p-8 text-center text-gray-500">Loading item details...</div>
   if (!item) return <div className="p-8 text-center text-red-500">Item not found.</div>
 
   const accessories = item.accessories ? JSON.parse(item.accessories) : []
+  const isPosting = adState === 'posting'
+  const isPosted = adState === 'posted' || item.rentalAd?.isPublished
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -40,10 +110,73 @@ export default function ItemViewPage() {
             <p className="text-sm text-gray-500">SKU: {item.sku || 'N/A'}</p>
           </div>
         </div>
-        <Link href={`/dashboard/items/${id}/edit`} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
-          <Edit2 className="w-4 h-4" /> Edit Item
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handlePostAd}
+            disabled={isPosting || isPosted}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              isPosting
+                ? 'bg-purple-100 text-purple-700 cursor-not-allowed'
+                : isPosted
+                ? 'bg-green-100 text-green-800 cursor-default'
+                : adState === 'error'
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'
+            }`}
+          >
+            {isPosting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Posting Ad...</span>
+              </>
+            ) : isPosted ? (
+              <>
+                <Megaphone className="w-4 h-4" />
+                <span>Ad Posted</span>
+              </>
+            ) : (
+              <>
+                <Megaphone className="w-4 h-4" />
+                <span>📢 Post Ad</span>
+              </>
+            )}
+          </button>
+
+          {isPosted && item.rentalAd && (
+            <>
+              <Link
+                href={`/marketplace/${item.rentalAd.id}`}
+                target="_blank"
+                className="flex items-center gap-1.5 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                <ExternalLink className="w-4 h-4" /> View Public Ad
+              </Link>
+              <button
+                type="button"
+                onClick={handleUnpublishAd}
+                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200"
+                title="Unpublish Ad"
+              >
+                <EyeOff className="w-4 h-4" />
+              </button>
+            </>
+          )}
+
+          <Link href={`/dashboard/items/${id}/edit`} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+            <Edit2 className="w-4 h-4" /> Edit Item
+          </Link>
+        </div>
       </div>
+
+      {adErrorMessage && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center justify-between">
+          <span>{adErrorMessage}</span>
+          <button type="button" onClick={handlePostAd} className="font-semibold underline hover:text-red-900">
+            Retry
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

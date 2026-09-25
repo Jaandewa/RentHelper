@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Search, Plus, X, Calendar, User, Package, CreditCard, ChevronLeft, ChevronRight, Check, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Search, Plus, X, Calendar, User, Package, CreditCard, ChevronLeft, ChevronRight, Check, AlertCircle, Loader2 } from 'lucide-react'
 
 const STEPS = [
   { id: 1, title: 'Select Customer', desc: 'Who is renting?' },
@@ -12,46 +12,109 @@ const STEPS = [
   { id: 4, title: 'Confirm', desc: 'Review & create' },
 ]
 
-const mockCustomers = [
-  { id: '1', name: 'Kasun Perera', phone: '0771234567', kycStatus: 'verified', trustScore: 4.8 },
-  { id: '2', name: 'Malsha Fernando', phone: '0762345678', kycStatus: 'pending', trustScore: 0 },
-  { id: '3', name: 'Ravi Silva', phone: '0753456789', kycStatus: 'verified', trustScore: 3.5 },
-  { id: '4', name: 'Nimal Dissanayake', phone: '0715678901', kycStatus: 'verified', trustScore: 5.0 },
-]
+interface CustomerOption {
+  id: string
+  displayId: string
+  name: string
+  phone: string
+  email: string
+  kycStatus: string
+  trustScore: number
+}
 
-const mockItems = [
-  { id: '1', name: 'Sony A7III Camera', sku: 'CAM-001', dailyRate: 5000, depositAmount: 50000, status: 'available' },
-  { id: '2', name: 'DJI Ronin-S Gimbal', sku: 'GIM-001', dailyRate: 2500, depositAmount: 25000, status: 'available' },
-  { id: '3', name: 'Aputure 120D Light', sku: 'LGT-001', dailyRate: 1500, depositAmount: 15000, status: 'available' },
-  { id: '4', name: 'Tent 6x6m', sku: 'TNT-001', dailyRate: 3500, depositAmount: 20000, status: 'available' },
-]
+interface ItemOption {
+  id: string
+  name: string
+  sku: string | null
+  dailyRate: number
+  depositAmount: number
+  status: string
+}
 
 type SelectedItem = { id: string; name: string; dailyRate: number; depositAmount: number; quantity: number }
 
-export default function NewBookingPage() {
+function NewBookingInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedCustomerId = searchParams.get('customerId')
+
   const [step, setStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const [fetchingData, setFetchingData] = useState(true)
+
+  const [customers, setCustomers] = useState<CustomerOption[]>([])
+  const [items, setItems] = useState<ItemOption[]>([])
+
   const [customerSearch, setCustomerSearch] = useState('')
   const [itemSearch, setItemSearch] = useState('')
 
-  const [selectedCustomer, setSelectedCustomer] = useState<typeof mockCustomers[0] | null>(null)
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null)
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([])
   const [dates, setDates] = useState({ pickupDate: '', returnDate: '', pickupTime: '09:00', returnTime: '18:00' })
   const [pricing, setPricing] = useState({ discountAmount: 0, deliveryCharge: 0, advancePercent: 30 })
   const [notes, setNotes] = useState('')
 
-  const filteredCustomers = mockCustomers.filter(c =>
-    c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.phone.includes(customerSearch)
+  useEffect(() => {
+    async function loadData() {
+      setFetchingData(true)
+      try {
+        const [custRes, itemRes] = await Promise.all([
+          fetch('/api/provider/customers'),
+          fetch('/api/items'),
+        ])
+
+        if (custRes.ok) {
+          const custData = await custRes.json()
+          const rawList = custData.customers || (Array.isArray(custData) ? custData : [])
+          const formatted = rawList.map((c: any) => ({
+            id: c.id,
+            displayId: c.displayId || `CUS-${c.id.slice(-6).toUpperCase()}`,
+            name: c.fullName || c.user?.name || 'Customer',
+            phone: c.primaryContactNumber || c.phone || 'N/A',
+            email: c.email || c.user?.email || '',
+            kycStatus: c.kycStatus || 'not_submitted',
+            trustScore: c.trustScore || 0,
+          }))
+          setCustomers(formatted)
+
+          if (preselectedCustomerId) {
+            const found = formatted.find((c: any) => c.id === preselectedCustomerId || c.displayId === preselectedCustomerId)
+            if (found) {
+              setSelectedCustomer(found)
+            }
+          }
+        }
+
+        if (itemRes.ok) {
+          const itemData = await itemRes.json()
+          const rawItems = Array.isArray(itemData) ? itemData : itemData.items || []
+          const availableOnly = rawItems.filter((i: any) => i.status === 'available' || i.status === 'booked')
+          setItems(availableOnly)
+        }
+      } catch (err) {
+        console.error('Failed to load booking resources:', err)
+      } finally {
+        setFetchingData(false)
+      }
+    }
+
+    loadData()
+  }, [preselectedCustomerId])
+
+  const filteredCustomers = customers.filter(c =>
+    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    c.phone.includes(customerSearch) ||
+    c.displayId.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    c.email.toLowerCase().includes(customerSearch.toLowerCase())
   )
 
-  const filteredItems = mockItems.filter(i =>
-    (i.name.toLowerCase().includes(itemSearch.toLowerCase()) || i.sku.toLowerCase().includes(itemSearch.toLowerCase())) &&
+  const filteredItems = items.filter(i =>
+    (i.name.toLowerCase().includes(itemSearch.toLowerCase()) || (i.sku && i.sku.toLowerCase().includes(itemSearch.toLowerCase()))) &&
     !selectedItems.find(s => s.id === i.id)
   )
 
-  const addItem = (item: typeof mockItems[0]) => {
-    setSelectedItems(prev => [...prev, { ...item, quantity: 1 }])
+  const addItem = (item: ItemOption) => {
+    setSelectedItems(prev => [...prev, { ...item, dailyRate: item.dailyRate || 0, depositAmount: item.depositAmount || 0, quantity: 1 }])
   }
 
   const removeItem = (id: string) => {
@@ -68,13 +131,17 @@ export default function NewBookingPage() {
   const advanceAmount = Math.round(totalAmount * pricing.advancePercent / 100)
 
   const handleSubmit = async () => {
+    if (!selectedCustomer) {
+      alert('Please select a customer')
+      return
+    }
     setIsLoading(true)
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerId: selectedCustomer?.id,
+          customerId: selectedCustomer.id,
           items: selectedItems,
           ...dates,
           days,
@@ -97,6 +164,15 @@ export default function NewBookingPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (fetchingData) {
+    return (
+      <div className="p-12 text-center text-gray-500">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-2" />
+        Loading booking resources...
+      </div>
+    )
   }
 
   return (
@@ -142,13 +218,13 @@ export default function NewBookingPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search customer by name or phone..."
+              placeholder="Search customer by ID, name, email, or phone..."
               className="pl-9 pr-4 py-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={customerSearch}
               onChange={e => setCustomerSearch(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-72 overflow-y-auto">
             {filteredCustomers.map(c => (
               <button
                 key={c.id}
@@ -162,12 +238,14 @@ export default function NewBookingPage() {
                     {c.name.charAt(0)}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{c.name}</p>
-                    <p className="text-sm text-gray-500">{c.phone}</p>
+                    <p className="font-medium text-gray-900 flex items-center gap-2">
+                      {c.name} <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{c.displayId}</span>
+                    </p>
+                    <p className="text-sm text-gray-500">{c.phone} • {c.email}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${c.kycStatus === 'verified' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${c.kycStatus === 'verified' || c.kycStatus === 'approved' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
                     {c.kycStatus}
                   </span>
                   {c.trustScore > 0 && <p className="text-xs text-gray-500 mt-1">★ {c.trustScore.toFixed(1)}</p>}
@@ -218,13 +296,13 @@ export default function NewBookingPage() {
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-72 overflow-y-auto">
             {filteredItems.map(item => (
               <button key={item.id} onClick={() => addItem(item)}
                 className="w-full flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50/30 transition-colors text-left">
                 <div>
                   <p className="font-medium text-gray-900">{item.name}</p>
-                  <p className="text-xs text-gray-500">{item.sku}</p>
+                  <p className="text-xs text-gray-500">{item.sku || 'No SKU'}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-gray-900">Rs. {item.dailyRate.toLocaleString()}/day</p>
@@ -253,16 +331,6 @@ export default function NewBookingPage() {
               <input type="date" value={dates.returnDate} onChange={e => setDates(d => ({...d, returnDate: e.target.value}))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Time</label>
-              <input type="time" value={dates.pickupTime} onChange={e => setDates(d => ({...d, pickupTime: e.target.value}))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Return Time</label>
-              <input type="time" value={dates.returnTime} onChange={e => setDates(d => ({...d, returnTime: e.target.value}))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
           </div>
 
           {days > 0 && (
@@ -282,11 +350,6 @@ export default function NewBookingPage() {
               <input type="number" value={pricing.deliveryCharge} onChange={e => setPricing(p => ({...p, deliveryCharge: +e.target.value}))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Advance Payment (%)</label>
-              <input type="number" min="0" max="100" value={pricing.advancePercent} onChange={e => setPricing(p => ({...p, advancePercent: +e.target.value}))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
           </div>
 
           <div className="border-t border-gray-200 pt-4 space-y-2">
@@ -296,13 +359,6 @@ export default function NewBookingPage() {
             <div className="flex justify-between text-base font-bold text-gray-900 pt-2 border-t"><span>Total</span><span>Rs. {totalAmount.toLocaleString()}</span></div>
             <div className="flex justify-between text-sm text-amber-700 font-medium"><span>Advance ({pricing.advancePercent}%)</span><span>Rs. {advanceAmount.toLocaleString()}</span></div>
             <div className="flex justify-between text-sm text-gray-500"><span>Security Deposit</span><span>Rs. {totalDeposit.toLocaleString()}</span></div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="Any special instructions or notes for this booking..." />
           </div>
         </div>
       )}
@@ -314,7 +370,7 @@ export default function NewBookingPage() {
             <Check className="w-5 h-5 text-blue-600" /> Confirm Booking
           </h2>
 
-          {selectedCustomer?.kycStatus !== 'verified' && (
+          {selectedCustomer?.kycStatus !== 'verified' && selectedCustomer?.kycStatus !== 'approved' && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2 text-sm text-amber-700">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               Customer KYC is not verified. The booking will be saved as "Pending Confirmation" until KYC is complete.
@@ -324,7 +380,7 @@ export default function NewBookingPage() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Customer</span>
-              <span className="text-sm font-medium">{selectedCustomer?.name}</span>
+              <span className="text-sm font-medium">{selectedCustomer?.name} ({selectedCustomer?.displayId})</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Items</span>
@@ -337,14 +393,6 @@ export default function NewBookingPage() {
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm text-gray-500">Total Amount</span>
               <span className="text-sm font-bold">Rs. {totalAmount.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-500">Advance Required</span>
-              <span className="text-sm font-medium text-amber-700">Rs. {advanceAmount.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between py-2">
-              <span className="text-sm text-gray-500">Security Deposit</span>
-              <span className="text-sm font-medium">Rs. {totalDeposit.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -381,5 +429,13 @@ export default function NewBookingPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function NewBookingPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Loading...</div>}>
+      <NewBookingInner />
+    </Suspense>
   )
 }
