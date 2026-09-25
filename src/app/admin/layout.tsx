@@ -40,11 +40,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (status === 'loading') return
-    if (!session?.user) { router.push('/auth/signin'); return }
-    if (session.user.role !== 'admin') { router.push('/dashboard'); return }
+    if (!session?.user) { router.replace('/auth/signin'); return }
+    // Only redirect if role is KNOWN and not admin — avoids loop with stale JWT
+    if (session.user.role && session.user.role !== 'admin') { router.replace('/dashboard'); return }
   }, [session, status, router])
 
-  if (status === 'loading' || !session?.user || session.user.role !== 'admin') {
+  if (status === 'loading' || !session?.user) {
     return (
       <div className="admin-loading">
         <div className="admin-spinner" />

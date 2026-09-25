@@ -26,15 +26,30 @@ export default middleware((req) => {
     return NextResponse.redirect(url)
   }
 
-  // Admin routes: only admins allowed
   const role = session.user?.role
-  if (pathname.startsWith('/admin') && role !== 'admin') {
+
+  // === ADMIN ROUTES: only admins allowed ===
+  // Only redirect if role is KNOWN and not admin (avoids loop when role is undefined/stale)
+  if (pathname.startsWith('/admin') && role && role !== 'admin') {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
-  // Customers should NOT access provider onboarding pages
-  if (role === 'customer' && (pathname.startsWith('/onboarding/business') || pathname.startsWith('/onboarding/categories'))) {
-    return NextResponse.redirect(new URL('/onboarding/kyc', req.url))
+  // === ADMIN on wrong pages → send to /admin ===
+  if (role === 'admin') {
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding')) {
+      return NextResponse.redirect(new URL('/admin', req.url))
+    }
+  }
+
+  // === CUSTOMERS should NOT access provider pages ===
+  if (role === 'customer') {
+    if (pathname.startsWith('/onboarding/business') || pathname.startsWith('/onboarding/categories')) {
+      return NextResponse.redirect(new URL('/onboarding/kyc', req.url))
+    }
+    // Block provider dashboard for customers
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/inventory') || pathname.startsWith('/bookings')) {
+      return NextResponse.redirect(new URL('/customer/pending-approval', req.url))
+    }
   }
 
   return NextResponse.next()
