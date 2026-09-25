@@ -2,15 +2,19 @@ import Link from 'next/link'
 import { Package, ClipboardList, Users, TrendingUp, Calendar as CalendarIcon, ArrowRight, Plus } from 'lucide-react'
 import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { getUserDestination } from '@/lib/auth/getUserDestination'
 import { redirect } from 'next/navigation'
 
 export default async function DashboardHome() {
   const session = await auth()
-  if (!session?.user?.id) redirect('/auth/signin')
+  if (!session?.user?.id) {
+    redirect('/auth/signin')
+  }
 
-  // Admin should never be on /dashboard — send to /admin
-  const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } })
-  if (userRecord?.role === 'admin') redirect('/admin')
+  const dest = await getUserDestination(session.user.id)
+  if (dest !== '/dashboard') {
+    redirect(dest)
+  }
 
   const business = await prisma.business.findUnique({
     where: { userId: session.user.id }

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function BusinessOnboarding() {
   const router = useRouter()
+  const [checking, setChecking] = useState(true)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -16,6 +17,19 @@ export default function BusinessOnboarding() {
     description: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/auth/destination')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.destination && data.destination !== '/onboarding/business') {
+          router.replace(data.destination)
+        } else {
+          setChecking(false)
+        }
+      })
+      .catch(() => setChecking(false))
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,6 +46,14 @@ export default function BusinessOnboarding() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
   }
 
   return (

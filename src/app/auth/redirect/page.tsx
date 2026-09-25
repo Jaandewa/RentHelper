@@ -14,37 +14,18 @@ export default function AuthRedirectPage() {
       return
     }
 
-    const role = session.user?.role
-
-    if (role === 'admin') {
-      window.location.href = '/admin'
-      return
-    }
-
-    if (role === 'customer') {
-      // Fetch fresh KYC status from DB
-      fetch('/api/auth/me')
-        .then(res => res.json())
-        .then(data => {
-          const kycStatus = data?.user?.customerProfile?.kycStatus
-          if (kycStatus === 'verified') {
-            window.location.href = '/customer/dashboard'
-          } else if (kycStatus === 'pending') {
-            window.location.href = '/customer/pending-approval'
-          } else if (kycStatus === 'rejected' || kycStatus === 'more_info_required') {
-            window.location.href = '/onboarding/kyc?resubmit=true'
-          } else {
-            window.location.href = '/onboarding/kyc'
-          }
-        })
-        .catch(() => {
-          window.location.href = '/onboarding/kyc'
-        })
-      return
-    }
-
-    // Provider
-    window.location.href = '/dashboard'
+    fetch('/api/auth/destination')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.destination) {
+          window.location.href = data.destination
+        } else {
+          window.location.href = '/dashboard'
+        }
+      })
+      .catch(() => {
+        window.location.href = '/dashboard'
+      })
   }, [session, status])
 
   return (

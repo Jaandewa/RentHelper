@@ -27,7 +27,7 @@ const navItems = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true },
   { label: 'Providers', href: '/admin/providers', icon: Building2 },
   { label: 'Customers', href: '/admin/customers', icon: Users },
-  { label: 'KYC Review', href: '/admin/customers?kycStatus=pending', icon: ShieldQuestion },
+  { label: 'KYC Review', href: '/admin/kyc-approvals', icon: ShieldQuestion },
   { label: 'Subscriptions', href: '/admin/subscriptions', icon: CreditCard },
   { label: 'Categories', href: '/admin/categories', icon: Tag },
   { label: 'All Users', href: '/admin/users', icon: UserCircle },
