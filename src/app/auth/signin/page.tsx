@@ -47,8 +47,13 @@ function SignInContent() {
           const kycStatus = meData?.user?.customerProfile?.kycStatus
           if (kycStatus === 'verified') {
             window.location.href = '/customer/dashboard'
-          } else {
+          } else if (kycStatus === 'pending') {
             window.location.href = '/customer/pending-approval'
+          } else if (kycStatus === 'rejected' || kycStatus === 'more_info_required') {
+            window.location.href = '/onboarding/kyc?resubmit=true'
+          } else {
+            // No profile or not_submitted
+            window.location.href = '/onboarding/kyc'
           }
         } else {
           // Provider — use callbackUrl if available
@@ -77,7 +82,7 @@ function SignInContent() {
         
         <div className="mt-8 space-y-6">
           <button
-            onClick={() => signIn('google', { callbackUrl: searchParams.get('callbackUrl') || '/dashboard' })}
+            onClick={() => signIn('google', { callbackUrl: '/auth/redirect' })}
             className="w-full flex justify-center items-center gap-3 py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             <svg viewBox="0 0 24 24" width="20" height="20">

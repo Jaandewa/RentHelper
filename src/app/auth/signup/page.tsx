@@ -74,7 +74,7 @@ function SignUpContent() {
     document.cookie = `pendingRole=${role}; path=/; max-age=3600`
     // For new users: auth.ts events.createUser will create profiles
     // For existing users: they'll just sign in and go to dashboard
-    signIn('google', { callbackUrl: role === 'provider' ? '/onboarding/categories' : '/onboarding/kyc' })
+    signIn('google', { callbackUrl: '/auth/redirect' })
   }
 
   if (!role) {

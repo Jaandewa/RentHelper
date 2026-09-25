@@ -40,19 +40,36 @@ export default function KYCOnboarding() {
   }
 
   const uploadFile = async (file: File, type: 'front' | 'back' | 'selfie') => {
+    // Validate file before uploading
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+    if (!allowedTypes.includes(file.type)) {
+      alert('Only JPG, PNG, WebP and PDF files are allowed.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File is larger than 10 MB. Please choose a smaller file.')
+      return
+    }
+
     setUploading(type)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      const fd = new FormData()
+      fd.append('images[]', file)  // Must match API field name
 
       const res = await fetch('/api/upload', {
         method: 'POST',
-        body: formData,
+        body: fd,
       })
 
-      if (!res.ok) throw new Error('Upload failed')
       const data = await res.json()
-      const url = data.url || data.fileUrl
+
+      if (!res.ok) {
+        throw new Error(data.message || data.error || `Upload failed (${res.status})`)
+      }
+
+      // Handle multiple PHP response formats
+      const url = data.files?.[0]?.url || data.urls?.[0] || data.url || data.fileUrl
+      if (!url) throw new Error('Upload succeeded but no URL returned')
 
       if (type === 'front') {
         setNicFrontUrl(url)
@@ -65,7 +82,7 @@ export default function KYCOnboarding() {
         setSelfieName(file.name)
       }
     } catch (err) {
-      alert(`Failed to upload ${type} photo. Please try again.`)
+      alert(err instanceof Error ? err.message : `Failed to upload ${type} photo. Please try again.`)
     } finally {
       setUploading(null)
     }

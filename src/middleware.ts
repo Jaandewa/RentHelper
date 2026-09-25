@@ -28,28 +28,57 @@ export default middleware((req) => {
   }
 
   const role = session.user?.role
+  const kycStatus = (session.user as any)?.kycStatus
 
   // === ADMIN ROUTES: only admins allowed ===
-  // Only redirect if role is KNOWN and not admin (avoids loop when role is undefined/stale)
   if (pathname.startsWith('/admin') && role && role !== 'admin') {
+    if (role === 'customer') {
+      return NextResponse.redirect(new URL('/customer/dashboard', req.url))
+    }
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
   // === ADMIN on wrong pages → send to /admin ===
   if (role === 'admin') {
-    if (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding')) {
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding') || pathname.startsWith('/customer')) {
       return NextResponse.redirect(new URL('/admin', req.url))
     }
   }
 
-  // === CUSTOMERS should NOT access provider pages ===
+  // === CUSTOMERS: role-based routing ===
   if (role === 'customer') {
+    // Block provider-only pages
     if (pathname.startsWith('/onboarding/business') || pathname.startsWith('/onboarding/categories')) {
+      // Route based on KYC status
+      if (kycStatus === 'verified') {
+        return NextResponse.redirect(new URL('/customer/dashboard', req.url))
+      } else if (kycStatus === 'pending') {
+        return NextResponse.redirect(new URL('/customer/pending-approval', req.url))
+      } else if (kycStatus === 'rejected' || kycStatus === 'more_info_required') {
+        return NextResponse.redirect(new URL('/onboarding/kyc?resubmit=true', req.url))
+      }
       return NextResponse.redirect(new URL('/onboarding/kyc', req.url))
     }
+
     // Block provider dashboard for customers
     if (pathname.startsWith('/dashboard') || pathname.startsWith('/inventory') || pathname.startsWith('/bookings')) {
-      return NextResponse.redirect(new URL('/customer/pending-approval', req.url))
+      if (kycStatus === 'verified') {
+        return NextResponse.redirect(new URL('/customer/dashboard', req.url))
+      } else if (kycStatus === 'pending') {
+        return NextResponse.redirect(new URL('/customer/pending-approval', req.url))
+      } else if (kycStatus === 'rejected' || kycStatus === 'more_info_required') {
+        return NextResponse.redirect(new URL('/onboarding/kyc?resubmit=true', req.url))
+      }
+      return NextResponse.redirect(new URL('/onboarding/kyc', req.url))
+    }
+
+    // Allow /onboarding/kyc and /customer/* pages
+  }
+
+  // === PROVIDERS should not access customer pages ===
+  if (role === 'provider') {
+    if (pathname.startsWith('/customer/')) {
+      return NextResponse.redirect(new URL('/dashboard', req.url))
     }
   }
 

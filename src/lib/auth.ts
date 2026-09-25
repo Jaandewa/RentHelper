@@ -52,14 +52,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id
         token.role = (user as any).role || 'customer'
       }
-      // Refetch role from DB on signIn to pick up role set by createUser event
-      if (trigger === 'signIn' && token.id) {
+      // Refetch role + KYC status from DB on signIn/signUp to get fresh data
+      if ((trigger === 'signIn' || trigger === 'signUp') && token.id) {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true }
+            include: { businessProfile: true, customerProfile: true },
           })
-          if (dbUser) token.role = dbUser.role
+          if (dbUser) {
+            token.role = dbUser.role
+            token.businessCompleted = Boolean(dbUser.businessProfile)
+            token.kycStatus = dbUser.customerProfile?.kycStatus || 'not_submitted'
+          }
         } catch {}
       }
       return token
@@ -68,6 +72,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = (token.role as string) || 'customer'
+        session.user.kycStatus = token.kycStatus || null
+        session.user.businessCompleted = Boolean(token.businessCompleted)
       }
       return session
     },
