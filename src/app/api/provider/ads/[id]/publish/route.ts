@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -12,7 +12,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const business = await prisma.business.findFirst({
       where: { userId: session.user.id },
     });
@@ -30,8 +30,8 @@ export async function POST(
       return NextResponse.json({ error: 'Ad not found or unauthorized' }, { status: 404 });
     }
 
-    if (!ad.item.name || ad.item.status !== 'ACTIVE') {
-      return NextResponse.json({ error: 'Item must have a name and be active to publish' }, { status: 400 });
+    if (!ad.item.name || ad.item.status === 'retired' || ad.item.status === 'damaged') {
+      return NextResponse.json({ error: 'Item must have a name and not be retired/damaged to publish' }, { status: 400 });
     }
 
     if (!ad.hourlyPrice && !ad.dailyPrice && !ad.weeklyPrice && !ad.monthlyPrice) {
