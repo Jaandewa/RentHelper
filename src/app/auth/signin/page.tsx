@@ -37,13 +37,27 @@ function SignInContent() {
         const session = await sessionRes.json()
         const role = session?.user?.role
 
-        const callbackUrl = searchParams.get('callbackUrl')
-        if (callbackUrl && !callbackUrl.includes('/auth/')) {
-          window.location.href = decodeURI(callbackUrl)
-        } else if (role === 'admin') {
+        // Role-based redirect — role ALWAYS takes priority
+        if (role === 'admin') {
           window.location.href = '/admin'
+        } else if (role === 'customer') {
+          // Check KYC status for customers
+          const meRes = await fetch('/api/auth/me')
+          const meData = await meRes.json()
+          const kycStatus = meData?.user?.customerProfile?.kycStatus
+          if (kycStatus === 'verified') {
+            window.location.href = '/dashboard'
+          } else {
+            window.location.href = '/customer/pending-approval'
+          }
         } else {
-          window.location.href = '/dashboard'
+          // Provider — use callbackUrl if available
+          const callbackUrl = searchParams.get('callbackUrl')
+          if (callbackUrl && !callbackUrl.includes('/auth/')) {
+            window.location.href = decodeURI(callbackUrl)
+          } else {
+            window.location.href = '/dashboard'
+          }
         }
       }
     } catch (err) {

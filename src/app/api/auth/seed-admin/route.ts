@@ -15,10 +15,18 @@ const DEFAULT_CATEGORIES = [
   { name: 'Other',               slug: 'other',           icon: '📦', description: 'Miscellaneous rental items', sortOrder: 10 },
 ]
 
-// POST /api/auth/seed-admin
+// GET or POST /api/auth/seed-admin
 // Creates the admin user + default categories if not already present.
 // Remove or protect this endpoint before going to production.
 export async function POST() {
+  return seedAdmin()
+}
+
+export async function GET() {
+  return seedAdmin()
+}
+
+async function seedAdmin() {
   try {
     const results: string[] = []
 

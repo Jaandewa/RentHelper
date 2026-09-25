@@ -8,6 +8,10 @@ export default async function DashboardHome() {
   const session = await auth()
   if (!session?.user?.id) redirect('/auth/signin')
 
+  // Admin should never be on /dashboard — send to /admin
+  const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } })
+  if (userRecord?.role === 'admin') redirect('/admin')
+
   const business = await prisma.business.findUnique({
     where: { userId: session.user.id }
   })
