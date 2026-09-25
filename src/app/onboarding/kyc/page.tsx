@@ -125,7 +125,9 @@ export default function KYCOnboarding() {
       })
 
       if (res.ok) {
-        router.push('/customer/pending-approval')
+        const data = await res.json()
+        router.replace(data.redirectTo || '/customer/pending-approval')
+        router.refresh()
       } else {
         const data = await res.json()
         alert(data.message || 'Failed to submit KYC')

@@ -9,12 +9,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const customer = await prisma.customerProfile.findUnique({
+    let customer = await prisma.customerProfile.findUnique({
       where: { userId: session.user.id }
     })
 
     if (!customer) {
-      return NextResponse.json({ message: 'Customer profile not found' }, { status: 404 })
+      customer = await prisma.customerProfile.create({
+        data: {
+          userId: session.user.id,
+          kycStatus: 'not_submitted',
+          accountStatus: 'incomplete',
+        }
+      })
     }
 
     const body = await req.json()
@@ -25,6 +31,13 @@ export async function POST(req: Request) {
       nicFrontUrl, nicBackUrl, selfieUrl,
       nicFrontName, nicBackName, selfieName,
     } = body
+
+    if (!nicFrontUrl || !nicBackUrl) {
+      return NextResponse.json(
+        { message: 'Please upload both front and back photos of your ID document.' },
+        { status: 400 }
+      )
+    }
 
     // Update customer profile with submitted data
     await prisma.customerProfile.update({
@@ -40,6 +53,9 @@ export async function POST(req: Request) {
         emergencyPhone: emergencyPhone || null,
         allowCrossProviderShare: consent ?? true,
         kycStatus: 'pending',
+        accountStatus: 'pending_approval',
+        kycSubmittedAt: new Date(),
+        kycRejectionReason: null,
       }
     })
 
@@ -86,7 +102,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // Create document records one by one (avoid createMany issues)
+    // Create document records one by one
     for (const doc of docs) {
       await prisma.customerDocument.create({ data: doc })
     }
@@ -101,7 +117,10 @@ export async function POST(req: Request) {
       }
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      success: true,
+      redirectTo: '/customer/pending-approval',
+    })
   } catch (error) {
     console.error('KYC submit error:', error)
     return NextResponse.json({ message: 'Server error' }, { status: 500 })

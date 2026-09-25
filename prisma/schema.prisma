@@ -151,7 +151,9 @@ model CustomerProfile {
   emergencyPhone          String?
   address                 String?
   city                    String?
-  kycStatus               String    @default("pending") // pending, verified, rejected, needs_more_info
+  kycStatus               String    @default("not_submitted") // not_submitted, pending, verified, rejected, needs_more_info
+  accountStatus           String    @default("incomplete") // incomplete, pending_approval, active, rejected, suspended
+  kycSubmittedAt          DateTime?
   kycRejectionReason      String?
   allowCrossProviderShare Boolean   @default(true)
   trustScore              Float     @default(0)

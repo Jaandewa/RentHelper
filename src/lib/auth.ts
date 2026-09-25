@@ -99,7 +99,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               data: { businessId: business.id, status: 'trial', planName: 'Free Trial', pricePerMonth: 0, maxItems: 5, trialEndsAt },
             })
           } else if (existingUser.role === 'customer' && !existingUser.customerProfile) {
-            await prisma.customerProfile.create({ data: { userId: existingUser.id } })
+            await prisma.customerProfile.create({ data: { userId: existingUser.id, kycStatus: 'not_submitted', accountStatus: 'incomplete' } })
           }
         }
       }
@@ -130,7 +130,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           data: { businessId: business.id, status: 'trial', planName: 'Free Trial', pricePerMonth: 0, maxItems: 5, trialEndsAt },
         })
       } else {
-        await prisma.customerProfile.create({ data: { userId: user.id! } })
+        await prisma.customerProfile.create({ data: { userId: user.id!, kycStatus: 'not_submitted', accountStatus: 'incomplete' } })
       }
     },
   },

@@ -13,6 +13,7 @@ interface UserData {
   customerProfile: {
     kycStatus: string
     kycRejectionReason: string | null
+    kycSubmittedAt: string | null
   } | null
 }
 
@@ -23,15 +24,20 @@ export default function PendingApprovalPage() {
 
   const fetchStatus = async () => {
     try {
+      // Check server destination first to enforce strict protection
+      const destRes = await fetch('/api/auth/destination')
+      if (destRes.ok) {
+        const destData = await destRes.json()
+        if (destData?.destination && destData.destination !== '/customer/pending-approval') {
+          router.replace(destData.destination)
+          return
+        }
+      }
+
       const res = await fetch('/api/auth/me')
       if (res.ok) {
         const data = await res.json()
         setUser(data.user)
-
-        // If verified, allow access
-        if (data.user?.customerProfile?.kycStatus === 'verified') {
-          // Don't auto-redirect, let user click
-        }
       }
     } catch {}
     setLoading(false)
@@ -61,11 +67,11 @@ export default function PendingApprovalPage() {
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
           {/* Status Icon */}
           <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
-            kycStatus === 'verified' ? 'bg-green-100' :
+            kycStatus === 'verified' || kycStatus === 'approved' ? 'bg-green-100' :
             kycStatus === 'rejected' ? 'bg-red-100' :
             'bg-amber-100'
           }`}>
-            {kycStatus === 'verified' ? (
+            {kycStatus === 'verified' || kycStatus === 'approved' ? (
               <CheckCircle className="w-10 h-10 text-green-600" />
             ) : kycStatus === 'rejected' ? (
               <XCircle className="w-10 h-10 text-red-500" />
@@ -75,21 +81,23 @@ export default function PendingApprovalPage() {
           </div>
 
           {/* Status Message */}
-          {kycStatus === 'pending' && (
+          {(kycStatus === 'pending' || kycStatus === 'not_submitted') && (
             <>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">Documents Under Review</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">Documents Submitted!</h2>
               <p className="text-gray-600 mb-6 leading-relaxed">
                 Our team will review your submission within 24 hours. 
-                You&apos;ll receive a notification once verified.
+                You will receive a notification once verified.
               </p>
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-                <div className="flex items-center gap-2 text-amber-700 text-sm font-medium mb-1">
+                <div className="flex items-center justify-center gap-2 text-amber-700 text-sm font-medium mb-1">
                   <FileText className="w-4 h-4" />
-                  KYC Status: Pending Review
+                  Status: Pending Review
                 </div>
-                <p className="text-amber-600 text-xs">
-                  This page auto-refreshes every 30 seconds
-                </p>
+                {user?.customerProfile?.kycSubmittedAt && (
+                  <p className="text-amber-600 text-xs">
+                    Submitted on: {new Date(user.customerProfile.kycSubmittedAt).toLocaleString()}
+                  </p>
+                )}
               </div>
               <button 
                 onClick={fetchStatus}
@@ -113,7 +121,7 @@ export default function PendingApprovalPage() {
                 </div>
               )}
               <button
-                onClick={() => router.push('/onboarding/kyc')}
+                onClick={() => router.push('/onboarding/kyc?resubmit=true')}
                 className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Resubmit Documents <ArrowRight className="w-4 h-4" />
@@ -121,17 +129,17 @@ export default function PendingApprovalPage() {
             </>
           )}
 
-          {kycStatus === 'verified' && (
+          {(kycStatus === 'verified' || kycStatus === 'approved') && (
             <>
               <h2 className="text-2xl font-bold text-gray-900 mb-3">You&apos;re Verified! 🎉</h2>
               <p className="text-gray-600 mb-6">
                 Your identity has been verified. You can now access the platform and make rental bookings.
               </p>
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push('/customer/dashboard')}
                 className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
               >
-                Continue to Dashboard <ArrowRight className="w-4 h-4" />
+                Continue to Customer Dashboard <ArrowRight className="w-4 h-4" />
               </button>
             </>
           )}
