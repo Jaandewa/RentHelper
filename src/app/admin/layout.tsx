@@ -19,6 +19,8 @@ import {
   Bell,
   Tag,
   ShieldQuestion,
+  MessageSquare,
+  Store,
 } from 'lucide-react'
 
 const navItems = [
@@ -29,6 +31,8 @@ const navItems = [
   { label: 'Subscriptions', href: '/admin/subscriptions', icon: CreditCard },
   { label: 'Categories', href: '/admin/categories', icon: Tag },
   { label: 'All Users', href: '/admin/users', icon: UserCircle },
+  { label: 'Marketplace Ads', href: '/admin/marketplace-ads', icon: Store },
+  { label: 'Notifications', href: '/admin/settings/notifications', icon: MessageSquare },
   { label: 'Site Settings', href: '/admin/settings', icon: Settings },
 ]
 

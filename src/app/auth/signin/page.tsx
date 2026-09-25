@@ -46,7 +46,7 @@ function SignInContent() {
           const meData = await meRes.json()
           const kycStatus = meData?.user?.customerProfile?.kycStatus
           if (kycStatus === 'verified') {
-            window.location.href = '/dashboard'
+            window.location.href = '/customer/dashboard'
           } else {
             window.location.href = '/customer/pending-approval'
           }

@@ -106,6 +106,7 @@ model Business {
   providerRatings     ProviderRating[]
   customerRatings     CustomerRating[]
   subscription        Subscription?
+  rentalAds           RentalAd[]
 
   @@index([slug])
   @@index([approvalStatus])
@@ -220,6 +221,7 @@ model Item {
   category     Category      @relation(fields: [categoryId], references: [id])
   itemImages   ItemImage[]
   bookingItems BookingItem[]
+  rentalAd     RentalAd?
 
   @@index([businessId])
   @@index([categoryId])
@@ -510,5 +512,64 @@ model SiteSettings {
   updatedAt             DateTime @updatedAt
   updatedBy             String?
 
+  // WhatsApp configuration
+  whatsappEnabled       Boolean  @default(false)
+  whatsappProvider      String   @default("meta")
+  whatsappBaseUrl       String?
+  whatsappAccessToken   String?
+  whatsappPhoneNumberId String?
+  whatsappBusinessId    String?
+  whatsappWebhookToken  String?
+  whatsappCountryCode   String   @default("+94")
+
   @@map("site_settings")
+}
+
+// ── Rental Ads (Marketplace) ──────────────────────────────────────────
+
+model RentalAd {
+  id              String   @id @default(cuid())
+  businessId      String
+  itemId          String   @unique
+  title           String
+  description     String?
+  coverImageUrl   String?
+  galleryImages   String?  // JSON array of image URLs
+  city            String?
+  address         String?
+  hourlyPrice     Float?
+  dailyPrice      Float?
+  weeklyPrice     Float?
+  monthlyPrice    Float?
+  securityDeposit Float?
+  isPublished     Boolean  @default(false)
+  isFeatured      Boolean  @default(false)
+  isAvailable     Boolean  @default(true)
+  viewsCount      Int      @default(0)
+  inquiriesCount  Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  item     Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([city])
+  @@index([isPublished])
+  @@map("rental_ads")
+}
+
+// ── Notification Delivery Log ─────────────────────────────────────────
+
+model NotificationDelivery {
+  id        String    @id @default(cuid())
+  type      String    // kyc_approved, kyc_rejected, booking_confirmed, etc.
+  recipient String    // phone number or email
+  channel   String    // whatsapp, email, sms
+  status    String    // sent, failed, not_configured
+  error     String?
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("notification_deliveries")
 }

@@ -14,7 +14,8 @@ export default middleware((req) => {
 
   const isProtected = protectedRoutes.some(route => pathname.startsWith(route))
 
-  if (!isProtected) return NextResponse.next()
+  // /marketplace is PUBLIC — no auth required
+  if (!isProtected || pathname.startsWith('/marketplace')) return NextResponse.next()
 
   // req.auth is populated by NextAuth v5 middleware
   const session = req.auth

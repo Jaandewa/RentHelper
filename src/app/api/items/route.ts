@@ -32,6 +32,7 @@ export async function GET(req: Request) {
       include: {
         category: true,
         itemImages: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        rentalAd: { select: { id: true, isPublished: true } },
       },
       orderBy: { createdAt: 'desc' },
     })

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Package, Plus, Search, Grid, List, Filter, Edit2, Trash2, Eye, Loader2 } from 'lucide-react'
+import { Package, Plus, Search, Grid, List, Filter, Edit2, Trash2, Eye, Loader2, Megaphone } from 'lucide-react'
 import Image from 'next/image'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -60,6 +60,43 @@ export default function ItemsPage() {
       }
     } catch (err) {
       alert('Error deleting item')
+    }
+  }
+
+  const handlePostAsAd = async (item: any) => {
+    if (item.rentalAd) {
+      window.open(`/marketplace/${item.rentalAd.id}`, '_blank')
+      return
+    }
+    try {
+      const res = await fetch('/api/provider/ads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemId: item.id,
+          title: item.name,
+          description: item.description || '',
+          city: '',
+          dailyPrice: item.dailyRate,
+          hourlyPrice: item.hourlyRate,
+          weeklyPrice: item.weeklyRate,
+          monthlyPrice: item.monthlyRate,
+          securityDeposit: item.depositAmount,
+          coverImageUrl: item.itemImages?.[0]?.url || '',
+          galleryImages: item.itemImages?.map((img: any) => img.url) || [],
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        await fetch(`/api/provider/ads/${data.ad?.id || data.id}/publish`, { method: 'POST' })
+        alert('Item posted as ad on marketplace! 🎉')
+        fetchItems()
+      } else {
+        const err = await res.json()
+        alert(err.message || 'Failed to create ad')
+      }
+    } catch {
+      alert('Failed to post as ad')
     }
   }
 
@@ -172,6 +209,13 @@ export default function ItemsPage() {
                         <Link href={`/dashboard/items/${item.id}/edit`} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
                           <Edit2 className="w-4 h-4" />
                         </Link>
+                        <button
+                          onClick={() => handlePostAsAd(item)}
+                          className={`p-1.5 rounded-lg transition-colors ${item.rentalAd?.isPublished ? 'text-green-500 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                          title={item.rentalAd?.isPublished ? 'View Ad' : 'Post as Ad'}
+                        >
+                          <Megaphone className="w-4 h-4" />
+                        </button>
                         <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -233,6 +277,13 @@ export default function ItemsPage() {
                             <Link href={`/dashboard/items/${item.id}/edit`} className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
                               <Edit2 className="w-4 h-4" />
                             </Link>
+                            <button
+                              onClick={() => handlePostAsAd(item)}
+                              className={`p-1.5 rounded-lg transition-colors ${item.rentalAd?.isPublished ? 'text-green-500 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                              title={item.rentalAd?.isPublished ? 'View Ad' : 'Post as Ad'}
+                            >
+                              <Megaphone className="w-4 h-4" />
+                            </button>
                             <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                               <Trash2 className="w-4 h-4" />
                             </button>
