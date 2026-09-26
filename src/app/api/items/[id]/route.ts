@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { validateCategoryData, DEFAULT_CATEGORY_CONFIGS } from '@/lib/categoryConfig'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -22,7 +23,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       where: { id: id, businessId: business.id },
       include: {
         itemImages: { orderBy: { sortOrder: 'asc' } },
-        category: true
+        category: true,
+        rentalAd: { select: { id: true, isPublished: true } },
       }
     })
 
@@ -66,21 +68,79 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       name, categorySlug, sku, brand, model, serialNumber,
       description, conditionGrade, dailyRate, weeklyRate,
       monthlyRate, depositAmount, bufferHours, purchasePrice,
-      replacementCost, notes, accessories
+      replacementCost, notes, accessories, categoryData,
+      customCategoryName, customFields
     } = body
 
-    if (!name || !dailyRate) {
-      return NextResponse.json({ message: 'Name and daily rate are required' }, { status: 400 })
+    if (!categorySlug) {
+      return NextResponse.json({
+        success: false,
+        message: 'Category selection is required',
+        errors: { categorySlug: 'Category is required' }
+      }, { status: 400 })
     }
 
-    let category = await prisma.category.findUnique({ where: { slug: categorySlug || 'other' } })
-    if (!category) {
-      category = await prisma.category.create({
-        data: {
-          name: categorySlug?.replace(/-/g, ' ') || 'Other',
-          slug: categorySlug || 'other',
+    if (!name || !dailyRate) {
+      return NextResponse.json({
+        success: false,
+        message: 'Name and daily rate are required',
+        errors: {
+          ...(!name ? { name: 'Name is required' } : {}),
+          ...(!dailyRate ? { dailyRate: 'Daily rate is required' } : {}),
+        }
+      }, { status: 400 })
+    }
+
+    let slugToUse = categorySlug
+
+    // Handle Custom Category
+    if (categorySlug === 'other' && customCategoryName && customCategoryName.trim()) {
+      const baseSlug = customCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      slugToUse = `custom-${business.id.slice(0, 5)}-${baseSlug}`
+
+      await prisma.category.upsert({
+        where: { slug: slugToUse },
+        update: {
+          name: customCategoryName,
+          fields: customFields || [],
+          isCustom: true,
+          businessId: business.id,
+        },
+        create: {
+          name: customCategoryName,
+          slug: slugToUse,
+          icon: '🏷️',
+          description: `Custom category created by ${business.name}`,
+          fields: customFields || [],
+          isCustom: true,
+          businessId: business.id,
+          sortOrder: 99,
         }
       })
+    }
+
+    let category = await prisma.category.findUnique({ where: { slug: slugToUse } })
+    if (!category) {
+      const defaultConfig = DEFAULT_CATEGORY_CONFIGS[slugToUse]
+      category = await prisma.category.create({
+        data: {
+          name: defaultConfig?.name || slugToUse.replace(/-/g, ' '),
+          slug: slugToUse,
+          icon: defaultConfig?.icon || '📦',
+          fields: defaultConfig?.fields ? (defaultConfig.fields as any) : [],
+        }
+      })
+    }
+
+    // Server-side Category Data Validation
+    const categoryFieldsConfig = (category.fields as any[]) || customFields || []
+    const validation = validateCategoryData(slugToUse, categoryData || {}, categoryFieldsConfig)
+    if (!validation.isValid) {
+      return NextResponse.json({
+        success: false,
+        message: 'Validation failed for category-specific attributes',
+        errors: validation.errors
+      }, { status: 400 })
     }
 
     const item = await prisma.item.update({
@@ -103,6 +163,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         replacementCost: replacementCost ? parseFloat(replacementCost) : null,
         notes,
         accessories: accessories ? JSON.stringify(accessories) : null,
+        categoryData: categoryData || null,
+      },
+      include: {
+        category: true,
+        itemImages: true,
       }
     })
 
@@ -147,7 +212,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ message: 'Business not found' }, { status: 404 })
     }
 
-    // Verify item belongs to this business
     const item = await prisma.item.findUnique({
       where: { id: id }
     })

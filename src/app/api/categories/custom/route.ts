@@ -9,51 +9,59 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
-    const { name } = await req.json()
+    const { name, fields } = await req.json()
     if (!name || name.trim() === '') {
-      return NextResponse.json({ message: 'Name is required' }, { status: 400 })
+      return NextResponse.json({ message: 'Category name is required' }, { status: 400 })
     }
 
     const business = await prisma.business.findUnique({
-      where: { userId: session.user.id }
+      where: { userId: session.user.id },
     })
 
     if (!business) {
-      return NextResponse.json({ message: 'Business not found' }, { status: 404 })
+      return NextResponse.json({ message: 'Business profile not found' }, { status: 404 })
     }
 
-    const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    const customSlug = `custom-${business.id.slice(0,5)}-${baseSlug}`
+    const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    const customSlug = `custom-${business.id.slice(0, 5)}-${baseSlug}`
 
-    // Upsert the custom category
-    await prisma.category.upsert({
+    const category = await prisma.category.upsert({
       where: { slug: customSlug },
-      update: {},
+      update: {
+        name,
+        fields: fields || [],
+        isCustom: true,
+        businessId: business.id,
+      },
       create: {
-        name: name,
+        name,
         slug: customSlug,
-        icon: 'Package',
-      }
+        icon: '🏷️',
+        description: `Custom category created by ${business.name}`,
+        fields: fields || [],
+        isCustom: true,
+        businessId: business.id,
+        sortOrder: 99,
+      },
     })
 
-    // Link it to the business
     await prisma.businessCategory.upsert({
-      where: { 
+      where: {
         businessId_categorySlug: {
           businessId: business.id,
-          categorySlug: customSlug
-        }
+          categorySlug: customSlug,
+        },
       },
       update: {},
       create: {
         businessId: business.id,
-        categorySlug: customSlug
-      }
+        categorySlug: customSlug,
+      },
     })
 
-    return NextResponse.json({ success: true, slug: customSlug })
+    return NextResponse.json({ success: true, category, slug: customSlug })
   } catch (error) {
-    console.error(error)
+    console.error('Error creating custom category:', error)
     return NextResponse.json({ message: 'Server error' }, { status: 500 })
   }
 }

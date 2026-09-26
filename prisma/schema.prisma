@@ -126,12 +126,19 @@ model BusinessCategory {
 }
 
 model Category {
-  id          String  @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
-  slug        String  @unique
+  slug        String   @unique
   icon        String?
   description String?
-  sortOrder   Int     @default(0)
+  sortOrder   Int      @default(0)
+  fields      Json?
+  isCustom    Boolean  @default(false)
+  businessId  String?
+  isApproved  Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
   items       Item[]
 
@@ -216,6 +223,7 @@ model Item {
   notes               String?
   isActive            Boolean   @default(true)
   qrCode              String?
+  categoryData        Json?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { MapPin, Shield, Calendar, Info, Clock, CheckCircle, ChevronLeft } from 'lucide-react';
+import { MapPin, Shield, ChevronLeft, Layers, Check } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdDetailPage() {
@@ -37,6 +37,8 @@ export default function AdDetailPage() {
     ...(ad.item?.itemImages?.map((img: any) => img.url) || [])
   ];
 
+  const categoryData = ad.item?.categoryData && typeof ad.item.categoryData === 'object' ? ad.item.categoryData : {};
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -49,9 +51,9 @@ export default function AdDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
             {/* Image Gallery */}
             <div className="p-6 bg-gray-100 flex flex-col">
-              <div className="aspect-w-4 aspect-h-3 rounded-xl overflow-hidden bg-white mb-4 shadow-sm border border-gray-200">
+              <div className="aspect-w-4 aspect-h-3 rounded-xl overflow-hidden bg-white mb-4 shadow-sm border border-gray-200 min-h-[320px] flex items-center justify-center">
                 {activeImage ? (
-                  <img src={activeImage} alt={ad.title} className="w-full h-full object-contain" />
+                  <img src={activeImage} alt={ad.title} className="w-full h-full object-contain max-h-[420px]" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400">No image available</div>
                 )}
@@ -76,53 +78,77 @@ export default function AdDetailPage() {
                   <h1 className="text-3xl font-bold text-gray-900 mb-2">{ad.title}</h1>
                   <div className="flex items-center text-gray-500 mb-6">
                     <MapPin className="h-5 w-5 mr-1" />
-                    <span>{ad.city}</span>
+                    <span>{ad.city || ad.business?.city || 'Location'}</span>
                     <span className="mx-2">•</span>
-                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">
-                      {ad.item?.category?.name || 'Category'}
+                    <span className="bg-blue-100 text-blue-800 text-xs px-2.5 py-1 rounded-full font-semibold">
+                      {ad.item?.category?.icon || '📦'} {ad.item?.category?.name || 'Category'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="prose prose-blue text-gray-600 mb-8 max-w-none">
+              <div className="prose prose-blue text-gray-600 mb-6 max-w-none">
                 <p>{ad.description}</p>
               </div>
 
+              {/* Public Category Specifications */}
+              {Object.keys(categoryData).length > 0 && (
+                <div className="mb-6 bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-blue-600" /> Specifications & Features
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {Object.entries(categoryData).map(([key, value]) => {
+                      if (value === undefined || value === null || value === '') return null
+                      const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
+
+                      return (
+                        <div key={key} className="bg-white p-2.5 rounded-lg border border-slate-200/80">
+                          <span className="text-[11px] font-semibold text-slate-500 block mb-0.5">{label}</span>
+                          <span className="font-semibold text-slate-900">
+                            {typeof value === 'boolean' ? (value ? 'Yes ✓' : 'No') : Array.isArray(value) ? value.join(', ') : String(value)}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Pricing Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 {ad.hourlyPrice && (
                   <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
                     <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Hourly</p>
-                    <p className="text-2xl font-bold text-gray-900">${ad.hourlyPrice}</p>
+                    <p className="text-2xl font-bold text-gray-900">Rs. {ad.hourlyPrice.toLocaleString()}</p>
                   </div>
                 )}
                 {ad.dailyPrice && (
-                  <div className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100 shadow-sm relative overflow-hidden">
+                  <div className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100 shadow-xs relative overflow-hidden">
                     <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold">POPULAR</div>
                     <p className="text-xs text-blue-600 uppercase tracking-wide font-semibold mb-1">Daily</p>
-                    <p className="text-2xl font-bold text-blue-900">${ad.dailyPrice}</p>
+                    <p className="text-2xl font-bold text-blue-900">Rs. {ad.dailyPrice.toLocaleString()}</p>
                   </div>
                 )}
                 {ad.weeklyPrice && (
                   <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
                     <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Weekly</p>
-                    <p className="text-2xl font-bold text-gray-900">${ad.weeklyPrice}</p>
+                    <p className="text-2xl font-bold text-gray-900">Rs. {ad.weeklyPrice.toLocaleString()}</p>
                   </div>
                 )}
                 {ad.monthlyPrice && (
                   <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
                     <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Monthly</p>
-                    <p className="text-2xl font-bold text-gray-900">${ad.monthlyPrice}</p>
+                    <p className="text-2xl font-bold text-gray-900">Rs. {ad.monthlyPrice.toLocaleString()}</p>
                   </div>
                 )}
               </div>
 
               {/* Security Deposit */}
-              {ad.securityDeposit && (
-                <div className="flex items-center text-sm text-gray-600 bg-orange-50 p-3 rounded-lg border border-orange-100 mb-8">
-                  <Shield className="h-5 w-5 text-orange-500 mr-2" />
-                  <span>Requires a security deposit of <strong>${ad.securityDeposit}</strong></span>
+              {ad.securityDeposit > 0 && (
+                <div className="flex items-center text-sm text-gray-600 bg-orange-50 p-3 rounded-lg border border-orange-100 mb-6">
+                  <Shield className="h-5 w-5 text-orange-500 mr-2 shrink-0" />
+                  <span>Requires a refundable security deposit of <strong>Rs. {ad.securityDeposit.toLocaleString()}</strong></span>
                 </div>
               )}
 
@@ -130,27 +156,27 @@ export default function AdDetailPage() {
               <div className="mt-auto border-t border-gray-100 pt-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className="h-12 w-12 rounded-full bg-gray-200 overflow-hidden mr-4 shadow-sm border border-gray-200">
+                    <div className="h-12 w-12 rounded-full bg-gray-200 overflow-hidden mr-4 shadow-xs border border-gray-200">
                       {ad.business?.logo && <img src={ad.business.logo} alt={ad.business.name} className="w-full h-full object-cover" />}
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Provided by</p>
-                      <p className="text-lg font-semibold text-gray-900">{ad.business?.name}</p>
+                      <p className="text-xs text-gray-500">Provided by</p>
+                      <p className="text-base font-bold text-gray-900">{ad.business?.name}</p>
                     </div>
                   </div>
                   
                   {/* Action Button */}
                   <div>
                     {!session || !session.user ? (
-                      <button className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-md">
+                      <Link href="/auth/signin" className="inline-block bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-md text-sm">
                         Sign in to Book
-                      </button>
-                    ) : session.user?.kycStatus !== 'APPROVED' ? (
-                      <button className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-md">
+                      </Link>
+                    ) : session.user?.kycStatus !== 'APPROVED' && session.user?.role === 'customer' ? (
+                      <Link href="/onboarding/kyc" className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-md text-sm">
                         Complete Verification First
-                      </button>
+                      </Link>
                     ) : (
-                      <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-md">
+                      <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-md text-sm">
                         Request Booking
                       </button>
                     )}

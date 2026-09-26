@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Edit2, Package, Tag, FileText, CheckCircle2, Megaphone, Loader2, ExternalLink, EyeOff } from 'lucide-react'
+import { ArrowLeft, Edit2, Package, Tag, FileText, CheckCircle2, Megaphone, Loader2, ExternalLink, EyeOff, Lock, Layers } from 'lucide-react'
 
 type AdPostState = 'idle' | 'posting' | 'posted' | 'error'
 
@@ -95,8 +95,15 @@ export default function ItemViewPage() {
   if (!item) return <div className="p-8 text-center text-red-500">Item not found.</div>
 
   const accessories = item.accessories ? JSON.parse(item.accessories) : []
+  const categoryData = item.categoryData && typeof item.categoryData === 'object' ? item.categoryData : {}
   const isPosting = adState === 'posting'
   const isPosted = adState === 'posted' || item.rentalAd?.isPublished
+
+  // Private fields list
+  const privateFields = [
+    'chassisNumber', 'engineNumber', 'insurancePolicyNumber', 'imei1', 'imei2',
+    'serialNumberPrivate', 'assetTag', 'medicalCertNumber', 'damageNotesPrivate', 'internalNotes'
+  ]
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -106,7 +113,14 @@ export default function ItemViewPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{item.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-gray-900">{item.name}</h1>
+              {item.category && (
+                <span className="bg-blue-50 text-blue-700 font-semibold px-2.5 py-0.5 rounded-full text-xs border border-blue-200">
+                  {item.category.icon || '📦'} {item.category.name}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500">SKU: {item.sku || 'N/A'}</p>
           </div>
         </div>
@@ -199,7 +213,40 @@ export default function ItemViewPage() {
             )}
           </div>
 
-          {/* Details */}
+          {/* Category-Specific Attributes Card */}
+          {Object.keys(categoryData).length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+                <Layers className="w-5 h-5 text-blue-600" /> {item.category?.name || 'Category'} Specifications
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                {Object.entries(categoryData).map(([key, value]) => {
+                  if (value === undefined || value === null || value === '') return null
+                  const isPrivate = privateFields.includes(key)
+                  const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
+
+                  return (
+                    <div key={key} className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-slate-500">{label}</span>
+                        {isPrivate && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200" title="Hidden on public marketplace ads">
+                            <Lock className="w-2.5 h-2.5" /> Private
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-semibold text-slate-900">
+                        {typeof value === 'boolean' ? (value ? 'Yes ✓' : 'No ✗') : Array.isArray(value) ? value.join(', ') : String(value)}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Description & Specs */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <FileText className="w-5 h-5 text-purple-600" /> Description & Specs
