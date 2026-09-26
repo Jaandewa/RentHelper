@@ -7,6 +7,7 @@ import { ArrowLeft, Upload, Plus, X, Tag, AlertCircle, CheckCircle2, Megaphone, 
 import { CategoryFieldsRenderer } from '@/components/CategoryFieldsRenderer'
 import { CustomCategoryBuilder } from '@/components/CustomCategoryBuilder'
 import { CategoryConfig, CategoryFieldConfig, DEFAULT_CATEGORY_CONFIGS, validateCategoryData } from '@/lib/categoryConfig'
+import { optimizeImageBeforeUpload } from '@/lib/upload/optimizeImage'
 
 export default function EditItemPage() {
   const router = useRouter()
@@ -18,6 +19,7 @@ export default function EditItemPage() {
   const [isFetchingItem, setIsFetchingItem] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [isUploadingImages, setIsUploadingImages] = useState(false)
+  const [uploadProgressText, setUploadProgressText] = useState('')
 
   // Form state
   const [selectedCategorySlug, setSelectedCategorySlug] = useState('')
@@ -46,7 +48,7 @@ export default function EditItemPage() {
     notes: '',
   })
 
-  const [images, setImages] = useState<{ url: string; caption: string }[]>([])
+  const [images, setImages] = useState<{ url: string; caption: string; stats?: string }[]>([])
   const [accessories, setAccessories] = useState<string[]>([])
   const [accessoryInput, setAccessoryInput] = useState('')
 
@@ -174,37 +176,62 @@ export default function EditItemPage() {
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
+    const fileList = e.target.files
+    if (!fileList || fileList.length === 0) return
 
-    if (images.length + files.length > 10) {
+    const rawFiles = Array.from(fileList)
+
+    if (images.length + rawFiles.length > 10) {
       alert('You can only upload a maximum of 10 photos per item.')
       return
     }
 
     setIsUploadingImages(true)
-    const formData = new FormData()
-    for (let i = 0; i < files.length; i++) {
-      formData.append('images[]', files[i])
-    }
 
     try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      })
-      const data = await res.json()
+      const uploadedPhotos: { url: string; caption: string; stats?: string }[] = []
 
-      if (res.ok && data.success && data.files) {
-        const newImages = data.files.map((f: any) => ({ url: f.url, caption: '' }))
-        setImages(prev => [...prev, ...newImages])
-      } else {
-        alert(data.message || data.errors?.join('\n') || 'Failed to upload images')
+      for (let i = 0; i < rawFiles.length; i++) {
+        const rawFile = rawFiles[i]
+        const countLabel = rawFiles.length > 1 ? ` (${i + 1}/${rawFiles.length})` : ''
+
+        setUploadProgressText(`Optimizing image${countLabel}...`)
+        const optResult = await optimizeImageBeforeUpload(rawFile, { purpose: 'item' })
+
+        setUploadProgressText(`Uploading image${countLabel}...`)
+        const formData = new FormData()
+        formData.append('images[]', optResult.file)
+
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+        const data = await res.json()
+
+        if (res.ok && (data.success || data.files)) {
+          const url = data.files?.[0]?.url || data.urls?.[0] || data.url || data.fileUrl
+          if (url) {
+            const statsStr = optResult.wasOptimized
+              ? `Original: ${optResult.formattedOriginalSize} → Optimized: ${optResult.formattedOptimizedSize}`
+              : optResult.formattedOriginalSize
+            uploadedPhotos.push({ url, caption: '', stats: statsStr })
+          } else {
+            throw new Error('Upload succeeded but no URL returned')
+          }
+        } else {
+          alert(data.message || data.error || data.errors?.join('\n') || `Failed to upload ${rawFile.name}`)
+        }
+      }
+
+      if (uploadedPhotos.length > 0) {
+        setImages(prev => [...prev, ...uploadedPhotos])
       }
     } catch (err: any) {
-      alert('Upload failed: ' + (err?.message || 'Network error'))
+      alert('Photo optimization or upload failed: ' + (err?.message || 'Network error'))
     } finally {
       setIsUploadingImages(false)
+      setUploadProgressText('')
+      if (e.target) e.target.value = ''
     }
   }
 
@@ -516,21 +543,21 @@ export default function EditItemPage() {
               <input
                 type="file"
                 multiple
-                accept="image/jpeg, image/png, image/webp"
+                accept="image/*,application/pdf"
                 onChange={handleImageUpload}
                 disabled={isUploadingImages || images.length >= 10}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
               />
               {isUploadingImages ? (
                 <div className="animate-pulse flex flex-col items-center">
-                  <Upload className="w-8 h-8 text-blue-500 mb-2" />
-                  <p className="text-xs font-medium text-blue-700">Uploading photos to server...</p>
+                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-2" />
+                  <p className="text-xs font-medium text-blue-700">{uploadProgressText || 'Processing photos...'}</p>
                 </div>
               ) : (
                 <>
                   <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                   <p className="text-xs font-medium text-slate-700">Click to upload or drag & drop photos</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">PNG, JPG up to 10MB each</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">High-res camera photos up to 30 MB (Auto-optimized)</p>
                 </>
               )}
             </label>
@@ -551,8 +578,18 @@ export default function EditItemPage() {
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
+                    {idx === 0 && (
+                      <span className="absolute bottom-1.5 left-1.5 bg-blue-600/90 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded">
+                        Cover Photo
+                      </span>
+                    )}
                   </div>
-                  <div className="p-2">
+                  <div className="p-2 space-y-1.5">
+                    {img.stats && (
+                      <p className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded truncate" title={img.stats}>
+                        {img.stats}
+                      </p>
+                    )}
                     <input
                       type="text"
                       value={img.caption}
