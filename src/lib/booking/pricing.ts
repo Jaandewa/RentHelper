@@ -6,6 +6,8 @@
 export type PricingInput = {
   pickupDate: string | Date
   returnDate: string | Date
+  pickupTime?: string
+  returnTime?: string
   dailyRate: number
   weeklyRate?: number | null
   monthlyRate?: number | null
@@ -19,6 +21,7 @@ export type PricingInput = {
 
 export type PricingResult = {
   rentalDays: number
+  durationHours: number
   rentalCharge: number
   deliveryCharge: number
   setupCharge: number
@@ -32,15 +35,70 @@ export type PricingResult = {
 }
 
 /**
- * Calculate the number of rental days between pickup and return dates.
- * Minimum 1 day.
+ * Combine a date string and optional time string into a single Date.
+ * If time is missing, defaults to "10:00".
+ * Uses local-time parsing (no UTC shift).
  */
-export function calculateRentalDays(pickupDate: string | Date, returnDate: string | Date): number {
-  const pickup = new Date(pickupDate)
-  const returnD = new Date(returnDate)
-  const diffMs = returnD.getTime() - pickup.getTime()
+export function combineDateAndTime(date: string, time?: string): Date {
+  const safeTime = time && time.trim() ? time.trim() : '10:00'
+  // Parse as local time: "YYYY-MM-DDTHH:mm:00"
+  const result = new Date(`${date}T${safeTime}:00`)
+  if (isNaN(result.getTime())) {
+    // Fallback: parse date only and set time manually
+    const d = new Date(date)
+    const [h, m] = safeTime.split(':').map(Number)
+    d.setHours(h || 10, m || 0, 0, 0)
+    return d
+  }
+  return result
+}
+
+/**
+ * Calculate the number of rental days between pickup and return date+time.
+ * Same-day rentals with a positive time gap count as 1 day minimum.
+ */
+export function calculateRentalDays(
+  pickupDate: string | Date,
+  returnDate: string | Date,
+  pickupTime?: string,
+  returnTime?: string,
+): number {
+  let pickupDT: Date
+  let returnDT: Date
+
+  if (typeof pickupDate === 'string' && typeof returnDate === 'string') {
+    pickupDT = combineDateAndTime(pickupDate, pickupTime)
+    returnDT = combineDateAndTime(returnDate, returnTime)
+  } else {
+    pickupDT = new Date(pickupDate)
+    returnDT = new Date(returnDate)
+  }
+
+  const diffMs = returnDT.getTime() - pickupDT.getTime()
+  const diffHours = diffMs / (1000 * 60 * 60)
+
+  // If within 24 hours, count as 1 day
+  if (diffHours > 0 && diffHours <= 24) {
+    return 1
+  }
+
   const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
   return Math.max(1, days)
+}
+
+/**
+ * Calculate the duration in hours between pickup and return.
+ */
+export function calculateDurationHours(
+  pickupDate: string,
+  returnDate: string,
+  pickupTime?: string,
+  returnTime?: string,
+): number {
+  const pickupDT = combineDateAndTime(pickupDate, pickupTime)
+  const returnDT = combineDateAndTime(returnDate, returnTime)
+  const diffMs = returnDT.getTime() - pickupDT.getTime()
+  return Math.max(0, diffMs / (1000 * 60 * 60))
 }
 
 /**
@@ -85,7 +143,26 @@ export function calculateRentalCharge(
  * Full price calculation for a booking request.
  */
 export function calculateBookingPricing(input: PricingInput): PricingResult {
-  const rentalDays = calculateRentalDays(input.pickupDate, input.returnDate)
+  const pickupDateStr = typeof input.pickupDate === 'string'
+    ? input.pickupDate
+    : input.pickupDate.toISOString().split('T')[0]
+  const returnDateStr = typeof input.returnDate === 'string'
+    ? input.returnDate
+    : input.returnDate.toISOString().split('T')[0]
+
+  const rentalDays = calculateRentalDays(
+    pickupDateStr,
+    returnDateStr,
+    input.pickupTime,
+    input.returnTime,
+  )
+
+  const durationHours = calculateDurationHours(
+    pickupDateStr,
+    returnDateStr,
+    input.pickupTime,
+    input.returnTime,
+  )
 
   const rentalCharge = calculateRentalCharge(
     rentalDays,
@@ -107,7 +184,11 @@ export function calculateBookingPricing(input: PricingInput): PricingResult {
 
   // Build breakdown text
   const lines: string[] = []
-  lines.push(`Rental: ${rentalDays} day${rentalDays !== 1 ? 's' : ''} × Rs. ${input.dailyRate.toLocaleString()} = Rs. ${rentalCharge.toLocaleString()}`)
+  if (rentalDays === 1 && durationHours < 24 && durationHours > 0) {
+    lines.push(`Rental: ${Math.round(durationHours)} hours (1 day minimum) × Rs. ${input.dailyRate.toLocaleString()} = Rs. ${rentalCharge.toLocaleString()}`)
+  } else {
+    lines.push(`Rental: ${rentalDays} day${rentalDays !== 1 ? 's' : ''} × Rs. ${input.dailyRate.toLocaleString()} = Rs. ${rentalCharge.toLocaleString()}`)
+  }
   if (deliveryCharge > 0) lines.push(`Delivery: Rs. ${deliveryCharge.toLocaleString()}`)
   if (setupCharge > 0) lines.push(`Setup: Rs. ${setupCharge.toLocaleString()}`)
   if (discount > 0) lines.push(`Discount: -Rs. ${discount.toLocaleString()}`)
@@ -118,6 +199,7 @@ export function calculateBookingPricing(input: PricingInput): PricingResult {
 
   return {
     rentalDays,
+    durationHours,
     rentalCharge,
     deliveryCharge,
     setupCharge,
@@ -132,22 +214,47 @@ export function calculateBookingPricing(input: PricingInput): PricingResult {
 }
 
 /**
- * Validate booking dates.
+ * Validate booking dates and times.
+ * Compares full datetime (date + time) to support same-day rentals.
  */
-export function validateBookingDates(pickupDate: string | Date, returnDate: string | Date): { valid: boolean; error?: string } {
-  const pickup = new Date(pickupDate)
-  const returnD = new Date(returnDate)
+export function validateBookingDates(
+  pickupDate: string | Date,
+  returnDate: string | Date,
+  pickupTime?: string,
+  returnTime?: string,
+): { valid: boolean; error?: string } {
+  const pickupStr = typeof pickupDate === 'string' ? pickupDate : pickupDate.toISOString().split('T')[0]
+  const returnStr = typeof returnDate === 'string' ? returnDate : returnDate.toISOString().split('T')[0]
+
+  // Basic date parse check
+  const pickupDateOnly = new Date(pickupStr)
+  const returnDateOnly = new Date(returnStr)
+  if (isNaN(pickupDateOnly.getTime())) return { valid: false, error: 'Invalid pickup date' }
+  if (isNaN(returnDateOnly.getTime())) return { valid: false, error: 'Invalid return date' }
+
+  // Pickup date must not be in the past
   const now = new Date()
-
-  if (isNaN(pickup.getTime())) return { valid: false, error: 'Invalid pickup date' }
-  if (isNaN(returnD.getTime())) return { valid: false, error: 'Invalid return date' }
-
-  // Allow pickup today
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  if (pickup < today) return { valid: false, error: 'Pickup date cannot be in the past' }
-  if (returnD <= pickup) return { valid: false, error: 'Return date must be after pickup date' }
+  if (pickupDateOnly < today) return { valid: false, error: 'Pickup date cannot be in the past' }
 
-  const days = calculateRentalDays(pickupDate, returnDate)
+  // Return date cannot be before pickup date
+  if (returnDateOnly < pickupDateOnly) {
+    return { valid: false, error: 'Return date/time must be after pickup date/time.' }
+  }
+
+  // Full datetime comparison (supports same-day rentals)
+  const pickupDT = combineDateAndTime(pickupStr, pickupTime)
+  const returnDT = combineDateAndTime(returnStr, returnTime)
+
+  if (returnDT.getTime() <= pickupDT.getTime()) {
+    if (pickupStr === returnStr) {
+      return { valid: false, error: 'For same-day rentals, return time must be later than pickup time.' }
+    }
+    return { valid: false, error: 'Return date/time must be after pickup date/time.' }
+  }
+
+  // Maximum rental period
+  const days = calculateRentalDays(pickupStr, returnStr, pickupTime, returnTime)
   if (days > 365) return { valid: false, error: 'Rental period cannot exceed 365 days' }
 
   return { valid: true }

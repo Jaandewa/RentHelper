@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { checkItemAvailability } from '@/lib/booking/availability'
-import { calculateBookingPricing, validateBookingDates } from '@/lib/booking/pricing'
+import { calculateBookingPricing, validateBookingDates, combineDateAndTime } from '@/lib/booking/pricing'
 import { generateBookingNumber } from '@/lib/utils'
 import { sendBookingRequestWhatsApp } from '@/lib/notifications/whatsapp'
 
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'You must accept the agreement' }, { status: 400 })
     }
 
-    const dateValidation = validateBookingDates(pickupDate, returnDate)
+    const dateValidation = validateBookingDates(pickupDate, returnDate, pickupTime, returnTime)
     if (!dateValidation.valid) {
       return NextResponse.json({ error: dateValidation.error }, { status: 400 })
     }
@@ -55,9 +55,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Item is not available for these dates' }, { status: 409 })
     }
 
+    // Server-side price recalculation — never trust client values
     const pricing = calculateBookingPricing({
-      pickupDate: pDate,
-      returnDate: rDate,
+      pickupDate,
+      returnDate,
+      pickupTime,
+      returnTime,
       dailyRate: ad.dailyPrice || ad.item.dailyRate,
       weeklyRate: ad.weeklyPrice || ad.item.weeklyRate,
       monthlyRate: ad.monthlyPrice || ad.item.monthlyRate,
