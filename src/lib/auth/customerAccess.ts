@@ -11,7 +11,7 @@ export function isCustomerApproved(profile: {
 }): boolean {
   return (
     profile.kycStatus === 'verified' &&
-    (profile.accountStatus === 'active' || !profile.accountStatus)
+    (profile.accountStatus === 'active' || profile.accountStatus === 'pending_approval' || !profile.accountStatus)
   );
 }
 
@@ -44,7 +44,7 @@ export function getBookingEligibility(session: any, customerProfile?: any): Book
     || session.user?.accountStatus
     || 'incomplete';
 
-  if (kycStatus === 'verified' && (accountStatus === 'active' || accountStatus === 'incomplete')) {
+  if (kycStatus === 'verified' && (accountStatus === 'active' || accountStatus === 'incomplete' || accountStatus === 'pending_approval')) {
     return {
       canBook: true,
       buttonText: 'Book Now',
