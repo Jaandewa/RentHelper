@@ -6,9 +6,10 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { 
   CheckCircle, ShoppingBag, Search, Clock, Package, 
-  ArrowRight, Star, MapPin, LogOut 
+  ArrowRight, Star, LogOut, FileText, AlertCircle, Calendar
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
+import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface UserData {
   id: string
@@ -27,18 +28,25 @@ export default function CustomerDashboard() {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [user, setUser] = useState<UserData | null>(null)
+  const [bookings, setBookings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (status === 'loading') return
     if (!session?.user) { router.replace('/auth/signin'); return }
     
-    fetch('/api/auth/me')
-      .then(r => r.json())
-      .then(d => {
-        setUser(d.user)
+    Promise.all([
+      fetch('/api/auth/me').then(r => r.json()),
+      fetch('/api/customer/booking-requests').then(r => r.json())
+    ])
+      .then(([userData, bookingsData]) => {
+        setUser(userData.user)
+        if (Array.isArray(bookingsData)) {
+          setBookings(bookingsData)
+        }
+        
         // If not verified, redirect
-        if (d.user?.customerProfile?.kycStatus !== 'verified') {
+        if (userData.user?.customerProfile?.kycStatus !== 'verified') {
           router.replace('/customer/pending-approval')
         }
         setLoading(false)
@@ -63,6 +71,11 @@ export default function CustomerDashboard() {
     { name: 'Musical Instruments', icon: '🎸', slug: 'musical' },
   ]
 
+  const pendingCount = bookings.filter(b => b.status === 'pending_provider_approval').length
+  const awaitingPaymentCount = bookings.filter(b => b.status === 'awaiting_advance_payment').length
+  const activeCount = bookings.filter(b => ['confirmed', 'active'].includes(b.status)).length
+  const completedCount = bookings.filter(b => b.status === 'completed').length
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -75,6 +88,9 @@ export default function CustomerDashboard() {
           <div className="flex items-center gap-4">
             <Link href="/marketplace" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
               Marketplace
+            </Link>
+            <Link href="/customer/bookings" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
+              My Bookings
             </Link>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
@@ -118,37 +134,48 @@ export default function CustomerDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
+                <Clock className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{pendingCount}</p>
+                <p className="text-xs text-gray-500 font-medium uppercase">Pending</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{awaitingPaymentCount}</p>
+                <p className="text-xs text-gray-500 font-medium uppercase">To Pay</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
                 <Package className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{user.customerProfile?.totalBookings || 0}</p>
-                <p className="text-sm text-gray-500">Total Bookings</p>
+                <p className="text-2xl font-bold text-gray-900">{activeCount}</p>
+                <p className="text-xs text-gray-500 font-medium uppercase">Active</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-                <Star className="w-5 h-5 text-green-600" />
+                <CheckCircle className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{(user.customerProfile?.trustScore || 0).toFixed(1)}</p>
-                <p className="text-sm text-gray-500">Trust Score</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900 capitalize">{user.customerProfile?.kycStatus}</p>
-                <p className="text-sm text-gray-500">KYC Status</p>
+                <p className="text-2xl font-bold text-gray-900">{completedCount}</p>
+                <p className="text-xs text-gray-500 font-medium uppercase">Completed</p>
               </div>
             </div>
           </div>
@@ -176,18 +203,68 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        {/* Recent Activity placeholder */}
+        {/* Recent Activity */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-gray-400" /> Recent Activity
-          </h2>
-          <div className="text-center py-8 text-gray-400">
-            <ShoppingBag className="w-10 h-10 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">No bookings yet. Start browsing the marketplace!</p>
-            <Link href="/marketplace" className="inline-flex items-center gap-2 mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium">
-              Explore Marketplace <ArrowRight className="w-3.5 h-3.5" />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-gray-400" /> Recent Bookings
+            </h2>
+            <Link href="/customer/bookings" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              View All
             </Link>
           </div>
+
+          {bookings.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <ShoppingBag className="w-10 h-10 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">No bookings yet. Start browsing the marketplace!</p>
+              <Link href="/marketplace" className="inline-flex items-center gap-2 mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                Explore Marketplace <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {bookings.slice(0, 5).map(booking => (
+                <div key={booking.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border rounded-lg hover:bg-gray-50">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{booking.bookingItems?.[0]?.item?.name || 'Item'}</h3>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        booking.status === 'awaiting_advance_payment' ? 'bg-red-100 text-red-800' :
+                        booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                        booking.status === 'completed' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {booking.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {booking.bookingNumber} • Provider: {booking.business?.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {formatDate(booking.pickupDate)} - {formatDate(booking.returnDate)}
+                    </p>
+                  </div>
+                  <div className="mt-4 sm:mt-0 text-right w-full sm:w-auto">
+                    <p className="font-bold text-lg">{formatCurrency(booking.totalAmount)}</p>
+                    {booking.status === 'awaiting_advance_payment' ? (
+                      <Link href={`/customer/bookings/${booking.id}/pay-advance`}>
+                        <button className="mt-2 w-full sm:w-auto px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors">
+                          Pay Advance
+                        </button>
+                      </Link>
+                    ) : (
+                      <Link href={`/customer/bookings/${booking.id}`}>
+                        <button className="mt-2 w-full sm:w-auto px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors">
+                          View Details
+                        </button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>

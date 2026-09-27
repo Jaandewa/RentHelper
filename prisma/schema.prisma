@@ -258,7 +258,7 @@ model Booking {
   businessId            String
   customerId            String
   bookingNumber         String    @unique
-  status                String    @default("quotation") // quotation, pending_confirmation, confirmed, active, returned_pending_settlement, completed, cancelled, no_show
+  status                String    @default("quotation") // quotation, pending_confirmation, pending_provider_approval, rejected_by_provider, awaiting_advance_payment, payment_expired, confirmed, active, returned_pending_settlement, completed, cancelled, no_show
   paymentStatus         String    @default("unpaid") // unpaid, partially_paid, paid, overdue, refund_pending, refunded
   pickupDate            DateTime
   returnDate            DateTime
@@ -278,6 +278,42 @@ model Booking {
   checkinNotes          String?
   customerSignatureUrl  String?
   calendarEventId       String?
+  
+  // Customer-initiated request fields
+  adId                  String?
+  purpose               String?
+  purposeDetails        String?
+  customerNotes         String?
+  deliveryRequired      Boolean   @default(false)
+  deliveryAddress       String?
+  categorySpecificData  Json?
+  pickupTime            String?   // e.g. "09:00"
+  returnTime            String?   // e.g. "17:00"
+  
+  // Agreement tracking
+  agreementAccepted     Boolean   @default(false)
+  agreementAcceptedAt   DateTime?
+  agreementVersion      String?
+  
+  // Price snapshots from the ad at time of request
+  hourlyRateSnapshot    Float?
+  dailyRateSnapshot     Float?
+  weeklyRateSnapshot    Float?
+  monthlyRateSnapshot   Float?
+  setupCharge           Float     @default(0)
+  
+  // Provider decision tracking
+  providerDecisionAt    DateTime?
+  providerDecisionBy    String?
+  providerRejectReason  String?
+  
+  // Temporary date hold
+  holdExpiresAt         DateTime?
+  holdStatus            String?   // active, expired, converted, released
+  
+  // Source of the booking
+  source                String    @default("provider") // provider, customer_marketplace
+
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -288,6 +324,7 @@ model Booking {
   invoices        Invoice[]
   customerRating  CustomerRating?
   providerRating  ProviderRating?
+  ad              RentalAd?        @relation(fields: [adId], references: [id])
 
   @@index([businessId])
   @@index([customerId])
@@ -562,6 +599,7 @@ model RentalAd {
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   item     Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  bookings Booking[]
 
   @@index([businessId])
   @@index([city])

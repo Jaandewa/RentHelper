@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { sanitizeCategoryDataForPublic } from '@/lib/categoryConfig'
-
+import { normalizeImageUrls } from '@/lib/media/normalizeImageUrl'
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -66,6 +66,8 @@ export async function GET(
         ...ad.item,
         categoryData: publicCategoryData,
       },
+      galleryImages: normalizeImageUrls(ad.galleryImages),
+      itemImageUrls: ad.item?.itemImages?.map((img: any) => img.url).filter(Boolean) || [],
     }
 
     return NextResponse.json(safeAd)

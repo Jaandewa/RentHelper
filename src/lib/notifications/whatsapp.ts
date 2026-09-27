@@ -192,3 +192,73 @@ export async function sendTestWhatsAppMessage(
 export async function sendTestWhatsApp(phone: string, message: string) {
   return sendWhatsAppText(phone, message)
 }
+
+export async function sendBookingRequestWhatsApp(providerPhone: string, details: { requestNumber: string, customerName: string, itemName: string, pickupDateTime: string, returnDateTime: string, purpose: string, rentalTotal: number, deposit: number, advanceRequired: number }) {
+  const message = `New rental request received.
+
+Request: ${details.requestNumber}
+Customer: ${details.customerName}
+Item: ${details.itemName}
+Pickup: ${details.pickupDateTime}
+Return: ${details.returnDateTime}
+Purpose: ${details.purpose}
+Estimated rental total: Rs. ${details.rentalTotal}
+Refundable deposit: Rs. ${details.deposit}
+Advance required: Rs. ${details.advanceRequired}
+
+Log in to review and accept or reject this request.`;
+  return sendWhatsAppText(providerPhone, message);
+}
+
+export async function sendBookingAcceptedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, advanceRequired: number }) {
+  const message = `Your rental request has been accepted!
+
+Item: ${details.itemName}
+Provider: ${details.providerName}
+Pickup: ${details.pickupDateTime}
+Return: ${details.returnDateTime}
+
+Advance payment required: Rs. ${details.advanceRequired}
+
+Please complete the advance payment to confirm your reservation.`;
+  return sendWhatsAppText(customerPhone, message);
+}
+
+export async function sendBookingRejectedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, reason: string }) {
+  const message = `Your rental request was not approved.
+
+Item: ${details.itemName}
+Provider: ${details.providerName}
+Reason: ${details.reason}
+
+You can browse other items on the marketplace.`;
+  return sendWhatsAppText(customerPhone, message);
+}
+
+export async function sendBookingConfirmedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, advancePaid: number, balanceDue: number, deposit: number }) {
+  const message = `Your rental has been confirmed!
+
+Item: ${details.itemName}
+Provider: ${details.providerName}
+Pickup: ${details.pickupDateTime}
+Return: ${details.returnDateTime}
+
+Advance paid: Rs. ${details.advancePaid}
+Remaining balance: Rs. ${details.balanceDue}
+Refundable deposit: Rs. ${details.deposit}
+
+Please bring required documents during handover.`;
+  return sendWhatsAppText(customerPhone, message);
+}
+
+export async function sendBookingConfirmedProviderWhatsApp(providerPhone: string, details: { customerName: string, itemName: string, pickupDateTime: string, returnDateTime: string, advancePaid: number }) {
+  const message = `Advance payment received and rental confirmed.
+
+Customer: ${details.customerName}
+Item: ${details.itemName}
+Pickup: ${details.pickupDateTime}
+Return: ${details.returnDateTime}
+Advance paid: Rs. ${details.advancePaid}`;
+  return sendWhatsAppText(providerPhone, message);
+}
+

@@ -26,6 +26,7 @@ export async function GET() {
             trustScore: true,
             totalBookings: true,
             phone: true,
+            accountStatus: true,
           }
         },
         businessProfile: {
