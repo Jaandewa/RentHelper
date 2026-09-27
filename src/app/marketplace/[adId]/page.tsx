@@ -37,7 +37,9 @@ export default function AdDetailPage() {
       .then(res => res.json())
       .then(data => {
         setAd(data);
-        setActiveImage(data.coverImageUrl || data.item?.itemImages?.[0]?.url);
+        // Use the canonical galleryImages array built server-side
+        const images: string[] = Array.isArray(data.galleryImages) ? data.galleryImages : [];
+        setActiveImage(images[0] || '');
         setLoading(false);
       })
       .catch(err => {
@@ -49,12 +51,8 @@ export default function AdDetailPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   if (!ad || ad.error) return <div className="min-h-screen flex items-center justify-center">Ad not found</div>;
 
-  const allImages = [
-    ...(ad.coverImageUrl ? [ad.coverImageUrl] : []),
-    ...(Array.isArray(ad.galleryImages) ? ad.galleryImages : []),
-    ...(ad.item?.itemImages?.map((img: any) => img.url).filter(Boolean) || [])
-  ].filter((v, i, a) => typeof v === 'string' && v.trim() && a.indexOf(v) === i);
-
+  // Use only the canonical galleryImages array from the API (already deduplicated and filtered server-side)
+  const allImages: string[] = Array.isArray(ad.galleryImages) ? ad.galleryImages : [];
   const validImages = allImages.filter(img => !failedImages.has(img));
 
   const eligibility = getBookingEligibility(session, customerProfile);

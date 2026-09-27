@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { sanitizeCategoryDataForPublic } from '@/lib/categoryConfig'
-import { normalizeImageUrls } from '@/lib/media/normalizeImageUrl'
+import { buildGalleryImages } from '@/lib/media/normalizeImageUrl'
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -27,7 +27,7 @@ export async function GET(
             id: true,
             name: true,
             conditionGrade: true,
-            itemImages: true,
+            itemImages: { orderBy: { sortOrder: 'asc' } },
             category: true,
             status: true,
             description: true,
@@ -60,14 +60,28 @@ export async function GET(
     const categorySlug = ad.item?.category?.slug || 'other'
     const publicCategoryData = sanitizeCategoryDataForPublic(categorySlug, rawCategoryData, (ad.item?.category?.fields as any) || [])
 
+    // Build one canonical, deduplicated gallery image array:
+    //   cover image → RentalAd galleryImages → ItemImage URLs
+    // Filters out null, empty, duplicate, malformed, and private/KYC URLs
+    const canonicalGallery = buildGalleryImages(
+      ad.coverImageUrl,
+      ad.galleryImages,
+      ad.item?.itemImages,
+    )
+
+    // If the original coverImageUrl is missing, use the first valid gallery image
+    const resolvedCoverUrl = ad.coverImageUrl?.trim() || canonicalGallery[0] || null
+
     const safeAd = {
       ...ad,
       item: {
         ...ad.item,
         categoryData: publicCategoryData,
+        // Remove raw itemImages from public response — all URLs are in galleryImages
+        itemImages: undefined,
       },
-      galleryImages: normalizeImageUrls(ad.galleryImages),
-      itemImageUrls: ad.item?.itemImages?.map((img: any) => img.url).filter(Boolean) || [],
+      coverImageUrl: resolvedCoverUrl,
+      galleryImages: canonicalGallery,
     }
 
     return NextResponse.json(safeAd)
