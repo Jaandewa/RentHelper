@@ -12,6 +12,7 @@ export default function AdDetailPage() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null); 
   const [customerProfile, setCustomerProfile] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeImage, setActiveImage] = useState('');
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
@@ -28,10 +29,13 @@ export default function AdDetailPage() {
                 setCustomerProfile(meData.user.customerProfile);
               }
             })
-            .catch(() => {});
+            .catch(err => console.error('Failed to fetch customer profile:', err))
+            .finally(() => setAuthLoading(false));
+        } else {
+          setAuthLoading(false);
         }
       })
-      .catch(() => {});
+      .catch(() => setAuthLoading(false));
 
     fetch(`/api/marketplace/ads/${adId}`)
       .then(res => res.json())
@@ -226,7 +230,9 @@ export default function AdDetailPage() {
                   
                   {/* Action Button */}
                   <div className="flex flex-col items-end gap-3">
-                    {eligibility.canBook ? (
+                    {authLoading ? (
+                      <div className="px-6 py-3 rounded-xl bg-gray-200 animate-pulse w-36 h-11" />
+                    ) : eligibility.canBook ? (
                       <Link 
                         href={`/marketplace/${ad.id}/book`}
                         className={`inline-block px-6 py-3 rounded-xl font-medium transition-colors shadow-md text-sm text-white ${eligibility.buttonStyle}`}

@@ -35,9 +35,14 @@ export function getBookingEligibility(session: any, customerProfile?: any): Book
     };
   }
 
-  // Customer - check KYC status
-  const kycStatus = customerProfile?.kycStatus || session.user?.kycStatus || 'not_submitted';
-  const accountStatus = customerProfile?.accountStatus || 'incomplete';
+  // Customer - use fresh DB data from customerProfile (via /api/auth/me)
+  // Only fall back to session (JWT) if customerProfile is not loaded yet
+  const kycStatus = customerProfile?.kycStatus
+    || session.user?.kycStatus
+    || 'not_submitted';
+  const accountStatus = customerProfile?.accountStatus
+    || session.user?.accountStatus
+    || 'incomplete';
 
   if (kycStatus === 'verified' && (accountStatus === 'active' || accountStatus === 'incomplete')) {
     return {
@@ -59,7 +64,7 @@ export function getBookingEligibility(session: any, customerProfile?: any): Book
   if (kycStatus === 'rejected' || kycStatus === 'needs_more_info') {
     return {
       canBook: false,
-      buttonText: 'Complete Verification',
+      buttonText: 'Resubmit Verification',
       buttonStyle: 'bg-orange-500 hover:bg-orange-600',
       linkTo: '/onboarding/kyc?resubmit=true',
     };

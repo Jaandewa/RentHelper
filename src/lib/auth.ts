@@ -52,19 +52,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id
         token.role = (user as any).role || 'customer'
       }
-      // Refetch role + KYC status from DB on signIn/signUp to get fresh data
-      if ((trigger === 'signIn' || trigger === 'signUp') && token.id) {
-        try {
-          const dbUser = await prisma.user.findUnique({
-            where: { id: token.id as string },
-            include: { businessProfile: true, customerProfile: true },
-          })
-          if (dbUser) {
-            token.role = dbUser.role
-            token.businessCompleted = Boolean(dbUser.businessProfile)
-            token.kycStatus = dbUser.customerProfile?.kycStatus || 'not_submitted'
-          }
-        } catch {}
+      // Refetch role + KYC status from DB periodically for customers
+      // This ensures admin KYC approval is picked up without re-login
+      if (token.id) {
+        const isSignInOrSignUp = trigger === 'signIn' || trigger === 'signUp'
+        const isCustomer = token.role === 'customer'
+        const now = Date.now()
+        const lastRefresh = (token.kycRefreshedAt as number) || 0
+        const stale = now - lastRefresh > 5 * 60 * 1000 // 5 minutes
+
+        if (isSignInOrSignUp || (isCustomer && stale)) {
+          try {
+            const dbUser = await prisma.user.findUnique({
+              where: { id: token.id as string },
+              include: { businessProfile: true, customerProfile: true },
+            })
+            if (dbUser) {
+              token.role = dbUser.role
+              token.businessCompleted = Boolean(dbUser.businessProfile)
+              token.kycStatus = dbUser.customerProfile?.kycStatus || 'not_submitted'
+              token.accountStatus = dbUser.customerProfile?.accountStatus || 'incomplete'
+              token.kycRefreshedAt = now
+            }
+          } catch {}
+        }
       }
       return token
     },
@@ -73,6 +84,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.id as string
         session.user.role = (token.role as string) || 'customer'
         session.user.kycStatus = token.kycStatus || null
+        session.user.accountStatus = token.accountStatus || null
         session.user.businessCompleted = Boolean(token.businessCompleted)
       }
       return session

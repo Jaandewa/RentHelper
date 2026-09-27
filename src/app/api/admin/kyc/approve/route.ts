@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       where: { id: customerId },
       data: {
         kycStatus: 'verified',
+        accountStatus: 'active',
         kycRejectionReason: null,
       },
     })
