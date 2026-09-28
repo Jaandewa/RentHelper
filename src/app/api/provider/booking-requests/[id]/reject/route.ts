@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import { sendBookingRejectedWhatsApp } from '@/lib/notifications/whatsapp'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,7 +22,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       where: { id },
       include: {
         business: true,
-        customer: true,
+        customer: { include: { user: true } },
+        bookingItems: { include: { item: true } },
       },
     })
 
@@ -37,7 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'This request cannot be rejected in its current status' }, { status: 400 })
     }
 
-    // Update booking status
+    // Update booking status atomically
     const updated = await prisma.booking.update({
       where: { id },
       data: {
@@ -45,16 +47,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         providerDecisionAt: new Date(),
         providerDecisionBy: session.user.id,
         providerRejectReason: reason,
+        // Release any hold if one existed
+        holdStatus: booking.holdStatus ? 'released' : null,
+      },
+      include: {
+        business: true,
+        customer: { include: { user: true } },
+        bookingItems: { include: { item: true } },
       },
     })
 
-    // Send WhatsApp notification to customer (stubbed out)
+    // Send WhatsApp notification to customer (failure does not block rejection)
     try {
       const customerPhone = booking.customer.phone
       if (customerPhone) {
-        // await sendBookingRejectedWhatsApp(...)
+        const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
+
+        await sendBookingRejectedWhatsApp(customerPhone, {
+          itemName,
+          providerName: booking.business.name,
+          reason,
+        })
       }
-    } catch (e) { console.error('WhatsApp notification failed:', e) }
+    } catch (e) {
+      console.error('WhatsApp notification failed:', e)
+    }
 
     return NextResponse.json({ success: true, booking: updated })
   } catch (error) {

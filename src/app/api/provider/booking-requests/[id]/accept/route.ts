@@ -1,8 +1,8 @@
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-// import { checkItemAvailability } from '@/lib/booking/availability'
-// import { sendBookingAcceptedWhatsApp } from '@/lib/notifications/whatsapp'
+import { checkItemAvailability } from '@/lib/booking/availability'
+import { sendBookingAcceptedWhatsApp } from '@/lib/notifications/whatsapp'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -34,34 +34,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'This request cannot be accepted in its current status' }, { status: 400 })
     }
 
-    // Re-check availability (stubbed out for now, can implement later if needed, but normally we'd check here)
+    // Re-check availability for each booking item
     for (const bi of booking.bookingItems) {
-      const conflicts = await prisma.bookingItem.findMany({
-        where: {
-          itemId: bi.itemId,
-          booking: {
-            status: { notIn: ['cancelled', 'completed', 'rejected_by_provider', 'payment_expired'] },
-            id: { not: booking.id },
-            AND: [
-              { pickupDate: { lt: booking.returnDate } },
-              { returnDate: { gt: booking.pickupDate } }
-            ]
-          }
-        }
-      })
-      
-      if (conflicts.length > 0) {
+      const availability = await checkItemAvailability(
+        bi.itemId,
+        booking.pickupDate,
+        booking.returnDate,
+        booking.id // exclude current booking from conflict check
+      )
+
+      if (!availability.available) {
         return NextResponse.json({
           error: `Item "${bi.item.name}" is no longer available for these dates`,
-          conflicts,
+          conflicts: availability.conflicts,
         }, { status: 409 })
       }
     }
 
-    // Set hold expiry to 24 hours from now
-    const holdExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    // Set hold expiry — use business config or default 24 hours
+    const holdHours = 24
+    const holdExpiresAt = new Date(Date.now() + holdHours * 60 * 60 * 1000)
 
-    // Update booking status
+    // Update booking status atomically
     const updated = await prisma.booking.update({
       where: { id },
       data: {
@@ -71,17 +65,40 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         holdExpiresAt,
         holdStatus: 'active',
       },
+      include: {
+        business: true,
+        customer: { include: { user: true } },
+        bookingItems: { include: { item: true } },
+        ad: true,
+      },
     })
 
-    // Send WhatsApp notification to customer (stubbed out)
+    // Send WhatsApp notification to customer (failure does not roll back acceptance)
     try {
       const customerPhone = booking.customer.phone
       if (customerPhone) {
-        // await sendBookingAcceptedWhatsApp(...)
-      }
-    } catch (e) { console.error('WhatsApp notification failed:', e) }
+        const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
+        const pickupDT = `${booking.pickupDate.toLocaleDateString()} ${booking.pickupTime || ''}`.trim()
+        const returnDT = `${booking.returnDate.toLocaleDateString()} ${booking.returnTime || ''}`.trim()
 
-    return NextResponse.json({ success: true, booking: updated })
+        await sendBookingAcceptedWhatsApp(customerPhone, {
+          itemName,
+          providerName: booking.business.name,
+          pickupDateTime: pickupDT,
+          returnDateTime: returnDT,
+          advanceRequired: booking.advanceAmount,
+        })
+      }
+    } catch (e) {
+      console.error('WhatsApp notification failed:', e)
+    }
+
+    return NextResponse.json({
+      success: true,
+      booking: updated,
+      holdExpiresAt: holdExpiresAt.toISOString(),
+      paymentDeadline: holdExpiresAt.toISOString(),
+    })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

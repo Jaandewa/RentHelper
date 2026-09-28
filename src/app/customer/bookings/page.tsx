@@ -67,11 +67,18 @@ export default function CustomerBookingsPage() {
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-semibold text-lg">{booking.bookingItems?.[0]?.item?.name || 'Item'}</h3>
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    booking.status === 'awaiting_advance_payment' ? 'bg-red-100 text-red-800' :
+                    booking.status === 'awaiting_advance_payment' ? 'bg-amber-100 text-amber-800' :
                     booking.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                    booking.status === 'pending_provider_approval' ? 'bg-purple-100 text-purple-800' :
+                    booking.status === 'rejected_by_provider' ? 'bg-red-100 text-red-800' :
+                    booking.status === 'payment_expired' ? 'bg-gray-100 text-gray-600' :
+                    booking.status === 'active' ? 'bg-green-100 text-green-800' :
                     booking.status === 'completed' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {booking.status.replace(/_/g, ' ')}
+                    {booking.status === 'pending_provider_approval' ? 'Awaiting Provider' :
+                     booking.status === 'awaiting_advance_payment' ? 'Pay Advance' :
+                     booking.status === 'rejected_by_provider' ? 'Rejected' :
+                     booking.status.replace(/_/g, ' ')}
                   </span>
                 </div>
                 <div className="text-sm text-gray-500 space-y-1">
@@ -81,6 +88,12 @@ export default function CustomerBookingsPage() {
                     <Calendar className="w-3.5 h-3.5" />
                     {formatDate(booking.pickupDate)} - {formatDate(booking.returnDate)}
                   </p>
+                  {booking.status === 'rejected_by_provider' && booking.providerRejectReason && (
+                    <p className="text-sm text-red-600"><span className="font-medium">Rejection reason:</span> {booking.providerRejectReason}</p>
+                  )}
+                  {booking.status === 'awaiting_advance_payment' && booking.holdExpiresAt && (
+                    <p className="text-sm text-amber-600 font-medium">Pay before: {new Date(booking.holdExpiresAt).toLocaleString()}</p>
+                  )}
                 </div>
               </div>
 
@@ -188,7 +201,7 @@ export default function CustomerBookingsPage() {
           {activeTab === 'awaiting_payment' && renderBookingList('awaiting_advance_payment')}
           {activeTab === 'active' && renderBookingList(['confirmed', 'active'])}
           {activeTab === 'completed' && renderBookingList('completed')}
-          {activeTab === 'rejected' && renderBookingList(['rejected', 'cancelled', 'payment_expired'])}
+          {activeTab === 'rejected' && renderBookingList(['rejected', 'rejected_by_provider', 'cancelled', 'payment_expired'])}
         </div>
       </div>
     </div>
