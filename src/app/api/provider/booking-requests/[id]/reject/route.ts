@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { sendBookingRejectedWhatsApp } from '@/lib/notifications/whatsapp'
+import { sendProviderDecisionNotification } from '@/lib/notifications/service'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -57,7 +58,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
     })
 
-    // Send WhatsApp notification to customer (failure does not block rejection)
+    // Unified notification: in-app + WhatsApp delivery log
+    sendProviderDecisionNotification(booking.customerId, id, 'rejected', reason).catch(e =>
+      console.error('[Notification] Provider reject notification error:', e)
+    )
+
+    // Direct WhatsApp (existing behavior preserved)
     try {
       const customerPhone = booking.customer.phone
       if (customerPhone) {

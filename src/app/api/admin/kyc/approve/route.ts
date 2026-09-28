@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/admin-guard'
-import { sendKycApprovedWhatsApp } from '@/lib/notifications/whatsapp'
+import { sendKycDecisionNotification } from '@/lib/notifications/service'
 
 export async function POST(req: NextRequest) {
   const { error, session } = await requireAdmin()
@@ -44,28 +44,10 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Create in-app notification if needed
-    if (customer.userId) {
-      await prisma.notification.create({
-        data: {
-          userId: customer.userId,
-          type: 'kyc_status',
-          channel: 'in_app',
-          subject: 'KYC Approved! 🎉',
-          body: 'Your account identity has been verified. You can now browse items and request rental bookings.',
-          scheduledAt: new Date(),
-          status: 'sent',
-        },
-      }).catch(console.error)
-    }
-
-    // Attempt WhatsApp notification safely (non-blocking)
-    if (customer.phone) {
-      const name = customer.user?.name || 'Customer'
-      sendKycApprovedWhatsApp({ phoneNumber: customer.phone, customerName: name }).catch(err => {
-        console.error('[WhatsApp approval error]', err)
-      })
-    }
+    // Unified notification: in-app + WhatsApp delivery log
+    sendKycDecisionNotification(customerId, 'approved').catch(e =>
+      console.error('[Notification] KYC approval notification error:', e)
+    )
 
     return NextResponse.json({ success: true, message: 'Customer KYC approved successfully' })
   } catch (err: any) {

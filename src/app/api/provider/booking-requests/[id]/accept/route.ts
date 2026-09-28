@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { checkItemAvailability } from '@/lib/booking/availability'
 import { sendBookingAcceptedWhatsApp } from '@/lib/notifications/whatsapp'
+import { sendProviderDecisionNotification } from '@/lib/notifications/service'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -73,7 +74,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
     })
 
-    // Send WhatsApp notification to customer (failure does not roll back acceptance)
+    // Unified notification: in-app + WhatsApp delivery log
+    sendProviderDecisionNotification(booking.customerId, id, 'accepted').catch(e =>
+      console.error('[Notification] Provider accept notification error:', e)
+    )
+
+    // Direct WhatsApp (existing behavior preserved)
     try {
       const customerPhone = booking.customer.phone
       if (customerPhone) {

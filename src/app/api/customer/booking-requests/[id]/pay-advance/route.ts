@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sendPaymentConfirmationNotification } from '@/lib/notifications/service'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // 1. Authenticate customer
@@ -74,7 +75,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     },
   })
 
-  // 10. Send WhatsApp to both parties
+  // Unified notification: in-app + WhatsApp delivery log for both parties
+  sendPaymentConfirmationNotification(booking.customerId, id, payment.id).catch(e =>
+    console.error('[Notification] Payment confirmation notification error:', e)
+  )
+
+  // 10. Send WhatsApp to both parties (existing behavior preserved)
   try {
     const customerPhone = booking.customer.phone
     if (customerPhone) {

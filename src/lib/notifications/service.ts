@@ -1,0 +1,441 @@
+/**
+ * Unified Notification Service
+ * 
+ * Dispatches notifications through multiple channels:
+ * - IN_APP: Always enabled (Notification model)
+ * - WHATSAPP: Logs delivery attempt (NotificationDelivery model), calls whatsapp.ts
+ * - EMAIL: Future channel (not implemented)
+ * 
+ * Each event-specific function:
+ * 1. Creates an in-app Notification record
+ * 2. Creates a NotificationDelivery log with eventType + metadata
+ * 3. Calls the appropriate WhatsApp function (handles not_configured gracefully)
+ * 4. Never throws — all errors are caught and logged
+ */
+
+import prisma from '@/lib/prisma'
+import {
+  sendKycApprovedWhatsApp,
+  sendKycRejectedWhatsApp,
+  sendBookingRequestWhatsApp,
+  sendBookingAcceptedWhatsApp,
+  sendBookingRejectedWhatsApp,
+  sendBookingConfirmedWhatsApp,
+  sendBookingConfirmedProviderWhatsApp,
+  sendWhatsAppText,
+} from '@/lib/notifications/whatsapp'
+
+// ── Event Types ──────────────────────────────────────────────────────────
+
+export type NotificationEventType =
+  | 'KYC_DECISION'
+  | 'NEW_BOOKING_REQUEST'
+  | 'PROVIDER_DECISION'
+  | 'REGISTRATION_OTP'
+  | 'PAYMENT_CONFIRMATION'
+  | 'HANDOVER_THANKS'
+
+// ── Core Dispatcher ──────────────────────────────────────────────────────
+
+interface DispatchParams {
+  userId: string
+  eventType: NotificationEventType
+  subject: string
+  body: string
+  recipientPhone?: string
+  relatedEntityId?: string
+  metadata?: Record<string, any>
+}
+
+/**
+ * Core dispatcher — creates in-app notification + WhatsApp delivery log.
+ * Never throws.
+ */
+async function dispatchNotification(params: DispatchParams): Promise<void> {
+  const { userId, eventType, subject, body, recipientPhone, relatedEntityId, metadata } = params
+
+  // 1. Create in-app notification (always)
+  try {
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: eventType.toLowerCase(),
+        channel: 'in_app',
+        subject,
+        body,
+        scheduledAt: new Date(),
+        status: 'sent',
+      },
+    })
+  } catch (e) {
+    console.error(`[Notification Service] Failed to create in-app notification for ${eventType}:`, e)
+  }
+
+  // 2. Create WhatsApp delivery log
+  if (recipientPhone) {
+    try {
+      await prisma.notificationDelivery.create({
+        data: {
+          type: 'whatsapp_text',
+          eventType,
+          recipient: recipientPhone,
+          recipientUserId: userId,
+          channel: 'whatsapp',
+          status: 'pending',
+          relatedEntityId: relatedEntityId || null,
+          metadata: metadata || undefined,
+          sentAt: new Date(),
+        },
+      })
+    } catch (e) {
+      console.error(`[Notification Service] Failed to create delivery log for ${eventType}:`, e)
+    }
+  }
+}
+
+// ── Event 1: KYC Decision ────────────────────────────────────────────────
+
+export async function sendKycDecisionNotification(
+  customerId: string,
+  status: 'approved' | 'rejected',
+  reason?: string
+): Promise<void> {
+  try {
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id: customerId },
+      include: { user: { select: { id: true, name: true } } },
+    })
+    if (!customer?.userId) return
+
+    const customerName = customer.user?.name || 'Customer'
+    const isApproved = status === 'approved'
+
+    const subject = isApproved
+      ? 'KYC Approved! 🎉'
+      : 'KYC Verification Rejected'
+
+    const body = isApproved
+      ? 'Your account identity has been verified. You can now browse items and request rental bookings.'
+      : `Your identity verification was rejected. Reason: ${reason || 'Documents not valid'}. Please resubmit corrected documents.`
+
+    const metadata = {
+      customerName,
+      kycStatus: status.toUpperCase(),
+      ...(reason ? { rejectionReason: reason } : {}),
+    }
+
+    await dispatchNotification({
+      userId: customer.userId,
+      eventType: 'KYC_DECISION',
+      subject,
+      body,
+      recipientPhone: customer.phone || undefined,
+      relatedEntityId: customerId,
+      metadata,
+    })
+
+    // Send WhatsApp (non-blocking)
+    if (customer.phone) {
+      if (isApproved) {
+        sendKycApprovedWhatsApp({ phoneNumber: customer.phone, customerName }).catch(e =>
+          console.error('[Notification Service] KYC approved WhatsApp failed:', e)
+        )
+      } else {
+        sendKycRejectedWhatsApp({ phoneNumber: customer.phone, customerName, reason: reason || 'Documents not valid' }).catch(e =>
+          console.error('[Notification Service] KYC rejected WhatsApp failed:', e)
+        )
+      }
+    }
+  } catch (e) {
+    console.error('[Notification Service] sendKycDecisionNotification error:', e)
+  }
+}
+
+// ── Event 2: New Booking Request to Provider ─────────────────────────────
+
+export async function sendNewBookingRequestNotification(
+  businessId: string,
+  bookingId: string
+): Promise<void> {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: { include: { user: true } },
+        customer: { include: { user: true } },
+        bookingItems: { include: { item: true } },
+      },
+    })
+    if (!booking) return
+
+    const providerUserId = booking.business.userId
+    const customerName = booking.customer?.user?.name || 'Customer'
+    const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
+    const pickupDT = `${booking.pickupDate.toLocaleDateString()} ${booking.pickupTime || ''}`.trim()
+    const returnDT = `${booking.returnDate.toLocaleDateString()} ${booking.returnTime || ''}`.trim()
+
+    const metadata = {
+      customerName,
+      itemName,
+      pickupDateTime: pickupDT,
+      returnDateTime: returnDT,
+      rentalTotal: booking.totalAmount,
+    }
+
+    await dispatchNotification({
+      userId: providerUserId,
+      eventType: 'NEW_BOOKING_REQUEST',
+      subject: 'New Booking Request',
+      body: `New rental request from ${customerName} for ${itemName}. Pickup: ${pickupDT}. Total: Rs. ${booking.totalAmount?.toLocaleString()}.`,
+      recipientPhone: booking.business.phone || undefined,
+      relatedEntityId: bookingId,
+      metadata,
+    })
+
+    // WhatsApp already called from booking-requests/route.ts — no duplicate needed here
+    // The existing sendBookingRequestWhatsApp call in the route handles this
+  } catch (e) {
+    console.error('[Notification Service] sendNewBookingRequestNotification error:', e)
+  }
+}
+
+// ── Event 3: Provider Decision to Customer ───────────────────────────────
+
+export async function sendProviderDecisionNotification(
+  customerId: string,
+  bookingId: string,
+  decision: 'accepted' | 'rejected',
+  rejectionReason?: string
+): Promise<void> {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: true,
+        customer: { include: { user: true } },
+        bookingItems: { include: { item: true } },
+      },
+    })
+    if (!booking?.customer?.userId) return
+
+    const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
+    const providerName = booking.business.name
+    const isAccepted = decision === 'accepted'
+    const pickupDT = `${booking.pickupDate.toLocaleDateString()} ${booking.pickupTime || ''}`.trim()
+    const returnDT = `${booking.returnDate.toLocaleDateString()} ${booking.returnTime || ''}`.trim()
+
+    const subject = isAccepted
+      ? 'Booking Request Accepted! ✅'
+      : 'Booking Request Not Approved'
+
+    const body = isAccepted
+      ? `Your rental request for ${itemName} from ${providerName} has been accepted. Advance payment of Rs. ${booking.advanceAmount?.toLocaleString()} is required. Please log in to complete payment.`
+      : `Your rental request for ${itemName} from ${providerName} was not approved. Reason: ${rejectionReason || 'Not specified'}. You can browse other items on the marketplace.`
+
+    const metadata: Record<string, any> = {
+      itemName,
+      providerName,
+      decision: decision.toUpperCase(),
+    }
+    if (isAccepted) {
+      metadata.advanceAmount = booking.advanceAmount
+      metadata.paymentDeadline = booking.holdExpiresAt?.toISOString()
+    }
+    if (rejectionReason) {
+      metadata.rejectionReason = rejectionReason
+    }
+
+    await dispatchNotification({
+      userId: booking.customer.userId,
+      eventType: 'PROVIDER_DECISION',
+      subject,
+      body,
+      recipientPhone: booking.customer.phone || undefined,
+      relatedEntityId: bookingId,
+      metadata,
+    })
+
+    // WhatsApp is already called from the accept/reject routes — no duplicate
+  } catch (e) {
+    console.error('[Notification Service] sendProviderDecisionNotification error:', e)
+  }
+}
+
+// ── Event 4: Registration OTP (Stub) ─────────────────────────────────────
+
+/**
+ * Stub: Called when OTP system is implemented.
+ * Currently no OTP model or generation exists in the codebase.
+ * 
+ * To enable: create OTP model, generate OTP in registration flow,
+ * then call this function with the user ID, OTP code, and expiry.
+ */
+export async function sendRegistrationOtpNotification(
+  userId: string,
+  otpCode: string,
+  expiryMinutes: number = 10
+): Promise<void> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true },
+    })
+    if (!user) return
+
+    // Find customer profile for phone
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+      select: { phone: true },
+    })
+
+    const metadata = {
+      otpCode, // Note: sensitive — will be redacted when WhatsApp templates are used
+      expiryMinutes,
+    }
+
+    await dispatchNotification({
+      userId,
+      eventType: 'REGISTRATION_OTP',
+      subject: 'Phone Verification Code',
+      body: `Your verification code is ${otpCode}. It expires in ${expiryMinutes} minutes. Do not share this code with anyone.`,
+      recipientPhone: customer?.phone || undefined,
+      relatedEntityId: userId,
+      metadata,
+    })
+
+    // WhatsApp OTP send (stub — will use Meta authentication template later)
+    if (customer?.phone) {
+      sendWhatsAppText(customer.phone, `Your verification code is ${otpCode}. It expires in ${expiryMinutes} minutes.`).catch(e =>
+        console.error('[Notification Service] OTP WhatsApp failed:', e)
+      )
+    }
+  } catch (e) {
+    console.error('[Notification Service] sendRegistrationOtpNotification error:', e)
+  }
+}
+
+// ── Event 5: Payment Confirmation ────────────────────────────────────────
+
+export async function sendPaymentConfirmationNotification(
+  customerId: string,
+  bookingId: string,
+  paymentId: string
+): Promise<void> {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: true,
+        customer: { include: { user: true } },
+        bookingItems: { include: { item: true } },
+        payments: { where: { id: paymentId } },
+      },
+    })
+    if (!booking?.customer?.userId) return
+
+    const payment = booking.payments[0]
+    if (!payment) return
+
+    const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
+    const providerName = booking.business.name
+    const balanceDue = booking.totalAmount - payment.amount
+
+    const metadata = {
+      bookingId: booking.bookingNumber,
+      amountPaid: payment.amount,
+      paymentDate: payment.paidAt.toISOString(),
+      remainingBalance: balanceDue,
+    }
+
+    // Customer notification
+    await dispatchNotification({
+      userId: booking.customer.userId,
+      eventType: 'PAYMENT_CONFIRMATION',
+      subject: 'Payment Received ✅',
+      body: `Your advance payment of Rs. ${payment.amount.toLocaleString()} for ${itemName} has been received. Booking confirmed! Remaining balance: Rs. ${balanceDue.toLocaleString()}.`,
+      recipientPhone: booking.customer.phone || undefined,
+      relatedEntityId: bookingId,
+      metadata,
+    })
+
+    // Provider notification
+    await dispatchNotification({
+      userId: booking.business.userId,
+      eventType: 'PAYMENT_CONFIRMATION',
+      subject: 'Advance Payment Received',
+      body: `Customer ${booking.customer.user?.name || 'Customer'} paid Rs. ${payment.amount.toLocaleString()} advance for ${itemName}. Booking is now confirmed.`,
+      recipientPhone: booking.business.phone || undefined,
+      relatedEntityId: bookingId,
+      metadata: { ...metadata, customerName: booking.customer.user?.name },
+    })
+
+    // WhatsApp is already called from pay-advance/route.ts — no duplicate
+  } catch (e) {
+    console.error('[Notification Service] sendPaymentConfirmationNotification error:', e)
+  }
+}
+
+// ── Event 6: Handover Thanks (Stub) ──────────────────────────────────────
+
+/**
+ * Stub: Called when handover API is implemented.
+ * Currently no handover endpoint or handed_over status exists.
+ * 
+ * To enable: create a handover route (POST /api/provider/bookings/[id]/handover),
+ * update booking status to 'active', then call this function.
+ */
+export async function sendHandoverThanksNotification(
+  customerId: string,
+  bookingId: string
+): Promise<void> {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: true,
+        customer: { include: { user: true } },
+        bookingItems: { include: { item: true } },
+      },
+    })
+    if (!booking?.customer?.userId) return
+
+    const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
+    const pickupDT = `${booking.pickupDate.toLocaleDateString()} ${booking.pickupTime || ''}`.trim()
+    const returnDT = `${booking.returnDate.toLocaleDateString()} ${booking.returnTime || ''}`.trim()
+    const supportContact = booking.business.phone || booking.business.name || 'the provider'
+
+    const metadata = {
+      itemName,
+      rentalPeriod: `${pickupDT} to ${returnDT}`,
+      supportContact,
+    }
+
+    await dispatchNotification({
+      userId: booking.customer.userId,
+      eventType: 'HANDOVER_THANKS',
+      subject: 'Item Picked Up! 🎉',
+      body: `Thank you for renting ${itemName}! Your rental period is ${pickupDT} to ${returnDT}. For any assistance, contact ${supportContact}. Please return the item in good condition.`,
+      recipientPhone: booking.customer.phone || undefined,
+      relatedEntityId: bookingId,
+      metadata,
+    })
+
+    // WhatsApp handover message
+    if (booking.customer.phone) {
+      const message = `Thank you for choosing ${booking.business.name}!
+
+Item: ${itemName}
+Rental period: ${pickupDT} to ${returnDT}
+
+For support, contact: ${supportContact}
+
+Please return the item on time and in good condition. Thank you!`
+
+      sendWhatsAppText(booking.customer.phone, message).catch(e =>
+        console.error('[Notification Service] Handover WhatsApp failed:', e)
+      )
+    }
+  } catch (e) {
+    console.error('[Notification Service] sendHandoverThanksNotification error:', e)
+  }
+}

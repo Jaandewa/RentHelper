@@ -610,14 +610,24 @@ model RentalAd {
 // ── Notification Delivery Log ─────────────────────────────────────────
 
 model NotificationDelivery {
-  id        String    @id @default(cuid())
-  type      String    // kyc_approved, kyc_rejected, booking_confirmed, etc.
-  recipient String    // phone number or email
-  channel   String    // whatsapp, email, sms
-  status    String    // sent, failed, not_configured
-  error     String?
-  sentAt    DateTime?
-  createdAt DateTime  @default(now())
+  id               String    @id @default(cuid())
+  type             String    // whatsapp_text, in_app, email, sms
+  eventType        String?   // KYC_DECISION, NEW_BOOKING_REQUEST, PROVIDER_DECISION, REGISTRATION_OTP, PAYMENT_CONFIRMATION, HANDOVER_THANKS
+  recipient        String    // phone number or email
+  recipientUserId  String?   // user ID for cross-referencing
+  channel          String    // whatsapp, email, sms, in_app
+  status           String    // sent, failed, not_configured, pending
+  error            String?
+  relatedEntityId  String?   // bookingId, kycId, paymentId
+  metadata         Json?     // template variables for future WhatsApp templates
+  sentAt           DateTime?
+  deliveredAt      DateTime?
+  readAt           DateTime?
+  retryCount       Int       @default(0)
+  createdAt        DateTime  @default(now())
 
+  @@index([eventType])
+  @@index([recipientUserId])
+  @@index([relatedEntityId])
   @@map("notification_deliveries")
 }

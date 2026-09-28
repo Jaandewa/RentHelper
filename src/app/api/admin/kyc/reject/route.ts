@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/admin-guard'
-import { sendKycRejectedWhatsApp } from '@/lib/notifications/whatsapp'
+import { sendKycDecisionNotification } from '@/lib/notifications/service'
 
 export async function POST(req: NextRequest) {
   const { error, session } = await requireAdmin()
@@ -47,28 +47,10 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Create in-app notification
-    if (customer.userId) {
-      await prisma.notification.create({
-        data: {
-          userId: customer.userId,
-          type: 'kyc_status',
-          channel: 'in_app',
-          subject: 'KYC Verification Rejected',
-          body: `Your identity verification was rejected. Reason: ${reason.trim()}. Please resubmit corrected documents.`,
-          scheduledAt: new Date(),
-          status: 'sent',
-        },
-      }).catch(console.error)
-    }
-
-    // Attempt WhatsApp notification safely (non-blocking)
-    if (customer.phone) {
-      const name = customer.user?.name || 'Customer'
-      sendKycRejectedWhatsApp({ phoneNumber: customer.phone, customerName: name, reason: reason.trim() }).catch(err => {
-        console.error('[WhatsApp rejection error]', err)
-      })
-    }
+    // Unified notification: in-app + WhatsApp delivery log
+    sendKycDecisionNotification(customerId, 'rejected', reason.trim()).catch(e =>
+      console.error('[Notification] KYC rejection notification error:', e)
+    )
 
     return NextResponse.json({ success: true, message: 'Customer KYC rejected successfully' })
   } catch (err: any) {

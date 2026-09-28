@@ -5,6 +5,7 @@ import { checkItemAvailability } from '@/lib/booking/availability'
 import { calculateBookingPricing, validateBookingDates, combineDateAndTime } from '@/lib/booking/pricing'
 import { generateBookingNumber } from '@/lib/utils'
 import { sendBookingRequestWhatsApp } from '@/lib/notifications/whatsapp'
+import { sendNewBookingRequestNotification } from '@/lib/notifications/service'
 
 export async function POST(req: Request) {
   try {
@@ -128,6 +129,12 @@ export async function POST(req: Request) {
       },
     })
 
+    // Unified notification: in-app + WhatsApp delivery log for provider
+    sendNewBookingRequestNotification(ad.businessId, booking.id).catch(e =>
+      console.error('[Notification] New booking request notification error:', e)
+    )
+
+    // Direct WhatsApp to provider (existing behavior preserved)
     try {
       if (ad.business.phone) {
         await sendBookingRequestWhatsApp(ad.business.phone, {
