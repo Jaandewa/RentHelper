@@ -643,3 +643,20 @@ model NotificationDelivery {
   @@index([relatedEntityId])
   @@map("notification_deliveries")
 }
+
+// ── WhatsApp Message Templates ────────────────────────────────────────
+
+model WhatsAppTemplate {
+  id          String   @id @default(cuid())
+  eventType   String   @unique   // KYC_APPROVED, BOOKING_ACCEPTED, etc.
+  name        String              // Human-readable name
+  description String?             // What this template is for
+  isEnabled   Boolean  @default(true)
+  messageBody String              // Template with {variable} placeholders
+  variables   String?             // JSON array of supported variable names
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?             // Admin who last edited
+
+  @@map("whatsapp_templates")
+}

@@ -22,7 +22,8 @@ import {
   sendBookingRejectedWhatsApp,
   sendBookingConfirmedWhatsApp,
   sendBookingConfirmedProviderWhatsApp,
-  sendWhatsAppText,
+  sendRegistrationOtpWhatsApp,
+  sendItemHandedOverWhatsApp,
 } from '@/lib/notifications/whatsapp'
 
 // ── Event Types ──────────────────────────────────────────────────────────
@@ -303,9 +304,13 @@ export async function sendRegistrationOtpNotification(
       metadata,
     })
 
-    // WhatsApp OTP send (stub — will use Meta authentication template later)
+    // WhatsApp OTP send via template renderer
     if (customer?.phone) {
-      sendWhatsAppText(customer.phone, `Your verification code is ${otpCode}. It expires in ${expiryMinutes} minutes.`).catch(e =>
+      sendRegistrationOtpWhatsApp(customer.phone, {
+        customerName: user?.name || 'Customer',
+        otpCode,
+        expiryMinutes,
+      }).catch(e =>
         console.error('[Notification Service] OTP WhatsApp failed:', e)
       )
     }
@@ -420,18 +425,16 @@ export async function sendHandoverThanksNotification(
       metadata,
     })
 
-    // WhatsApp handover message
+    // WhatsApp handover message via template renderer
     if (booking.customer.phone) {
-      const message = `Thank you for choosing ${booking.business.name}!
-
-Item: ${itemName}
-Rental period: ${pickupDT} to ${returnDT}
-
-For support, contact: ${supportContact}
-
-Please return the item on time and in good condition. Thank you!`
-
-      sendWhatsAppText(booking.customer.phone, message).catch(e =>
+      sendItemHandedOverWhatsApp(booking.customer.phone, {
+        customerName: booking.customer.user?.name || 'Customer',
+        itemName,
+        providerName: booking.business.name,
+        pickupDateTime: pickupDT,
+        returnDateTime: returnDT,
+        bookingId: booking.bookingNumber,
+      }).catch(e =>
         console.error('[Notification Service] Handover WhatsApp failed:', e)
       )
     }

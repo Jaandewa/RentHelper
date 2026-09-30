@@ -202,7 +202,12 @@ export async function sendWhatsAppText(
   }
 }
 
-// ── Message Helpers (construct text + call sendWhatsAppText) ──────────────
+// ── Message Helpers (use template renderer + call sendWhatsAppText) ──────
+
+import { renderWhatsAppTemplate } from './template-renderer'
+
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://rent.healingcity.lk'
+const SUPPORT_CONTACT = process.env.SUPPORT_CONTACT || '+94 77 123 4567'
 
 export async function sendKycApprovedWhatsApp(
   param1: string | KycApprovedParams,
@@ -219,15 +224,15 @@ export async function sendKycApprovedWhatsApp(
     customerName = param1.customerName || param1.name || 'Customer'
   }
 
-  const message = `Hello ${customerName},
+  const result = await renderWhatsAppTemplate('KYC_APPROVED', {
+    customerName,
+    appName: 'RentHelper',
+    loginUrl: `${BASE_URL}/auth/signin`,
+    supportContact: SUPPORT_CONTACT,
+  })
 
-Your Rental Management System account has been approved.
-
-You can now log in, browse rental items, compare prices, and send booking requests.
-
-Thank you.`
-
-  return sendWhatsAppText(phone, message)
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(phone, result.message)
 }
 
 export async function sendKycRejectedWhatsApp(
@@ -249,18 +254,15 @@ export async function sendKycRejectedWhatsApp(
     reason = param1.reason || 'Verification document invalid'
   }
 
-  const message = `Hello ${customerName},
+  const result = await renderWhatsAppTemplate('KYC_REJECTED', {
+    customerName,
+    rejectionReason: reason,
+    appName: 'RentHelper',
+    supportContact: SUPPORT_CONTACT,
+  })
 
-Your account verification was not approved.
-
-Reason:
-${reason}
-
-Please log in and submit the corrected documents again.
-
-Thank you.`
-
-  return sendWhatsAppText(phone, message)
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(phone, result.message)
 }
 
 export async function sendTestWhatsAppMessage(
@@ -275,83 +277,135 @@ export async function sendTestWhatsApp(phone: string, message: string) {
 }
 
 export async function sendBookingRequestWhatsApp(providerPhone: string, details: { requestNumber: string, customerName: string, itemName: string, pickupDateTime: string, returnDateTime: string, purpose: string, rentalTotal: number, deposit: number, advanceRequired: number }) {
-  const message = `New rental request received.
+  const result = await renderWhatsAppTemplate('NEW_BOOKING_REQUEST', {
+    providerName: 'Provider',
+    customerName: details.customerName,
+    bookingId: details.requestNumber,
+    itemName: details.itemName,
+    pickupDateTime: details.pickupDateTime,
+    returnDateTime: details.returnDateTime,
+    rentalTotal: String(details.rentalTotal),
+    advanceRequired: String(details.advanceRequired),
+    customerPurpose: details.purpose,
+    providerDashboardUrl: `${BASE_URL}/dashboard/bookings`,
+    supportContact: SUPPORT_CONTACT,
+  })
 
-Request: ${details.requestNumber}
-Customer: ${details.customerName}
-Item: ${details.itemName}
-Pickup: ${details.pickupDateTime}
-Return: ${details.returnDateTime}
-Purpose: ${details.purpose}
-Estimated rental total: Rs. ${details.rentalTotal}
-Refundable deposit: Rs. ${details.deposit}
-Advance required: Rs. ${details.advanceRequired}
-
-Log in to review and accept or reject this request.`;
-  return sendWhatsAppText(providerPhone, message);
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(providerPhone, result.message)
 }
 
-export async function sendBookingAcceptedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, advanceRequired: number }) {
-  const message = `Your rental request has been accepted!
+export async function sendBookingAcceptedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, advanceRequired: number, paymentDeadline?: string, bookingId?: string }) {
+  const result = await renderWhatsAppTemplate('BOOKING_ACCEPTED', {
+    customerName: 'Customer',
+    bookingId: details.bookingId,
+    itemName: details.itemName,
+    providerName: details.providerName,
+    pickupDateTime: details.pickupDateTime,
+    returnDateTime: details.returnDateTime,
+    advanceRequired: String(details.advanceRequired),
+    paymentDeadline: details.paymentDeadline,
+    paymentUrl: `${BASE_URL}/customer/bookings`,
+    supportContact: SUPPORT_CONTACT,
+  })
 
-Item: ${details.itemName}
-Provider: ${details.providerName}
-Pickup: ${details.pickupDateTime}
-Return: ${details.returnDateTime}
-
-Advance payment required: Rs. ${details.advanceRequired}
-
-Please complete the advance payment to confirm your reservation.`;
-  return sendWhatsAppText(customerPhone, message);
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(customerPhone, result.message)
 }
 
-export async function sendBookingRejectedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, reason: string }) {
-  const message = `Your rental request was not approved.
+export async function sendBookingRejectedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, reason: string, bookingId?: string }) {
+  const result = await renderWhatsAppTemplate('BOOKING_REJECTED', {
+    customerName: 'Customer',
+    bookingId: details.bookingId,
+    itemName: details.itemName,
+    providerName: details.providerName,
+    rejectionReason: details.reason,
+    marketplaceUrl: `${BASE_URL}/marketplace`,
+    supportContact: SUPPORT_CONTACT,
+  })
 
-Item: ${details.itemName}
-Provider: ${details.providerName}
-Reason: ${details.reason}
-
-You can browse other items on the marketplace.`;
-  return sendWhatsAppText(customerPhone, message);
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(customerPhone, result.message)
 }
 
-export async function sendBookingConfirmedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, advancePaid: number, balanceDue: number, deposit: number }) {
-  const message = `Your rental has been confirmed!
+export async function sendBookingConfirmedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, advancePaid: number, balanceDue: number, deposit: number, bookingId?: string }) {
+  const result = await renderWhatsAppTemplate('PAYMENT_CONFIRMED', {
+    customerName: 'Customer',
+    bookingId: details.bookingId,
+    itemName: details.itemName,
+    providerName: details.providerName,
+    amountPaid: String(details.advancePaid),
+    paymentDate: new Date().toLocaleDateString('en-LK'),
+    advancePaid: String(details.advancePaid),
+    remainingBalance: String(details.balanceDue),
+    securityDeposit: String(details.deposit),
+    bookingStatus: 'Confirmed',
+    bookingDetailsUrl: `${BASE_URL}/customer/bookings`,
+    supportContact: SUPPORT_CONTACT,
+  })
 
-Item: ${details.itemName}
-Provider: ${details.providerName}
-Pickup: ${details.pickupDateTime}
-Return: ${details.returnDateTime}
-
-Advance paid: Rs. ${details.advancePaid}
-Remaining balance: Rs. ${details.balanceDue}
-Refundable deposit: Rs. ${details.deposit}
-
-Please bring required documents during handover.`;
-  return sendWhatsAppText(customerPhone, message);
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(customerPhone, result.message)
 }
 
-export async function sendBookingConfirmedProviderWhatsApp(providerPhone: string, details: { customerName: string, itemName: string, pickupDateTime: string, returnDateTime: string, advancePaid: number }) {
-  const message = `Advance payment received and rental confirmed.
+export async function sendBookingConfirmedProviderWhatsApp(providerPhone: string, details: { customerName: string, itemName: string, pickupDateTime: string, returnDateTime: string, advancePaid: number, bookingId?: string }) {
+  const result = await renderWhatsAppTemplate('BOOKING_CONFIRMED_PROVIDER', {
+    providerName: 'Provider',
+    bookingId: details.bookingId,
+    customerName: details.customerName,
+    itemName: details.itemName,
+    pickupDateTime: details.pickupDateTime,
+    returnDateTime: details.returnDateTime,
+    amountPaid: String(details.advancePaid),
+    advancePaid: String(details.advancePaid),
+    providerBookingUrl: `${BASE_URL}/dashboard/bookings`,
+    supportContact: SUPPORT_CONTACT,
+  })
 
-Customer: ${details.customerName}
-Item: ${details.itemName}
-Pickup: ${details.pickupDateTime}
-Return: ${details.returnDateTime}
-Advance paid: Rs. ${details.advancePaid}`;
-  return sendWhatsAppText(providerPhone, message);
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(providerPhone, result.message)
 }
 
-export async function sendReviewSubmittedWhatsApp(recipientPhone: string, details: { reviewerName: string, rating: number, itemName: string, bookingNumber: string }) {
-  const stars = '⭐'.repeat(details.rating)
-  const message = `New review received!
+export async function sendReviewSubmittedWhatsApp(recipientPhone: string, details: { reviewerName: string, rating: number, itemName: string, bookingNumber: string, recipientName?: string }) {
+  const result = await renderWhatsAppTemplate('REVIEW_SUBMITTED', {
+    recipientName: details.recipientName || 'User',
+    reviewerName: details.reviewerName,
+    bookingId: details.bookingNumber,
+    itemName: details.itemName,
+    rating: String(details.rating),
+    reviewText: '',
+    profileUrl: `${BASE_URL}`,
+    supportContact: SUPPORT_CONTACT,
+  })
 
-${stars} (${details.rating}/5)
-Item: ${details.itemName}
-Booking: ${details.bookingNumber}
-From: ${details.reviewerName}
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(recipientPhone, result.message)
+}
 
-Thank you for using RentHelper!`;
-  return sendWhatsAppText(recipientPhone, message);
+export async function sendRegistrationOtpWhatsApp(phone: string, details: { customerName: string, otpCode: string, expiryMinutes?: number }) {
+  const result = await renderWhatsAppTemplate('REGISTRATION_OTP', {
+    customerName: details.customerName,
+    otpCode: details.otpCode,
+    expiryMinutes: String(details.expiryMinutes || 10),
+    appName: 'RentHelper',
+    supportContact: SUPPORT_CONTACT,
+  })
+
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(phone, result.message)
+}
+
+export async function sendItemHandedOverWhatsApp(customerPhone: string, details: { customerName: string, itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, bookingId?: string }) {
+  const result = await renderWhatsAppTemplate('ITEM_HANDED_OVER', {
+    customerName: details.customerName,
+    bookingId: details.bookingId,
+    itemName: details.itemName,
+    providerName: details.providerName,
+    pickupDateTime: details.pickupDateTime,
+    returnDateTime: details.returnDateTime,
+    supportContact: SUPPORT_CONTACT,
+  })
+
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(customerPhone, result.message)
 }

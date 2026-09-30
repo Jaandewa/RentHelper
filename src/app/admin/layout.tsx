@@ -21,6 +21,7 @@ import {
   ShieldQuestion,
   MessageSquare,
   Store,
+  FileText,
 } from 'lucide-react'
 
 const navItems = [
@@ -33,6 +34,7 @@ const navItems = [
   { label: 'All Users', href: '/admin/users', icon: UserCircle },
   { label: 'Marketplace Ads', href: '/admin/marketplace-ads', icon: Store },
   { label: 'Notifications', href: '/admin/settings/notifications', icon: MessageSquare },
+  { label: 'WhatsApp Templates', href: '/admin/settings/whatsapp-templates', icon: FileText },
   { label: 'Site Settings', href: '/admin/settings', icon: Settings },
 ]
 
