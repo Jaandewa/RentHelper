@@ -6,6 +6,7 @@
  */
 
 import prisma from '@/lib/prisma'
+import { sendReviewSubmittedWhatsApp } from '@/lib/notifications/whatsapp'
 
 // ── Submit Provider Rating (Customer rates Provider) ─────────────────────
 
@@ -30,8 +31,9 @@ export async function submitProviderRating(params: {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
     include: {
-      customer: true,
+      customer: { include: { user: true } },
       business: true,
+      bookingItems: { include: { item: true } },
       providerRating: true,
     },
   })
@@ -80,6 +82,18 @@ export async function submitProviderRating(params: {
   // Recalculate business average
   await recalculateBusinessRating(booking.businessId)
 
+  // WhatsApp notification to provider (non-blocking)
+  if (booking.business && booking.business.phone) {
+    const customerName = booking.customer?.user?.name || 'Customer'
+    const itemName = booking.bookingItems?.[0]?.item?.name || 'Rental item'
+    sendReviewSubmittedWhatsApp(booking.business.phone, {
+      reviewerName: customerName,
+      rating: overallScore,
+      itemName,
+      bookingNumber: booking.bookingNumber,
+    }).catch(e => console.error('[Review Service] Provider WhatsApp notification failed:', e))
+  }
+
   return { success: true, rating }
 }
 
@@ -107,7 +121,8 @@ export async function submitCustomerRating(params: {
     where: { id: bookingId },
     include: {
       business: true,
-      customer: true,
+      customer: { include: { user: true } },
+      bookingItems: { include: { item: true } },
       customerRating: true,
     },
   })
@@ -154,6 +169,18 @@ export async function submitCustomerRating(params: {
 
   // Recalculate customer average + trust score
   await recalculateCustomerRating(booking.customerId)
+
+  // WhatsApp notification to customer (non-blocking)
+  if (booking.customer?.phone) {
+    const providerName = booking.business?.name || 'Provider'
+    const itemName = booking.bookingItems?.[0]?.item?.name || 'Rental item'
+    sendReviewSubmittedWhatsApp(booking.customer.phone, {
+      reviewerName: providerName,
+      rating: overallScore,
+      itemName,
+      bookingNumber: booking.bookingNumber,
+    }).catch(e => console.error('[Review Service] Customer WhatsApp notification failed:', e))
+  }
 
   return { success: true, rating }
 }

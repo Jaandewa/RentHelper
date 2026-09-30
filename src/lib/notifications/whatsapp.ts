@@ -1,5 +1,21 @@
 import prisma from '@/lib/prisma'
 
+/**
+ * Formats a phone number for WhatsApp API (E.164 without +).
+ * Handles: 0771234567 → 94771234567, +94771234567 → 94771234567, 94771234567 → 94771234567
+ */
+function formatPhoneForWhatsApp(phone: string, countryCode: string = '+94'): string {
+  let cleaned = phone.replace(/[\s\-()]/g, '')
+  // Remove leading +
+  if (cleaned.startsWith('+')) cleaned = cleaned.slice(1)
+  // Replace leading 0 with country code digits
+  const codeDigits = countryCode.replace('+', '')
+  if (cleaned.startsWith('0')) cleaned = codeDigits + cleaned.slice(1)
+  // If number doesn't start with country code, prepend it
+  if (!cleaned.startsWith(codeDigits)) cleaned = codeDigits + cleaned
+  return cleaned
+}
+
 export interface WhatsAppSendParams {
   phoneNumber?: string
   phone?: string
@@ -42,6 +58,9 @@ export async function sendWhatsAppText(
 
   try {
     const settings = await prisma.siteSettings.findFirst()
+
+    // Format phone number with country code from settings
+    targetPhone = formatPhoneForWhatsApp(targetPhone, settings?.whatsappCountryCode || '+94')
 
     if (!settings?.whatsappEnabled) {
       // Log as not configured
@@ -260,5 +279,18 @@ Pickup: ${details.pickupDateTime}
 Return: ${details.returnDateTime}
 Advance paid: Rs. ${details.advancePaid}`;
   return sendWhatsAppText(providerPhone, message);
+}
+
+export async function sendReviewSubmittedWhatsApp(recipientPhone: string, details: { reviewerName: string, rating: number, itemName: string, bookingNumber: string }) {
+  const stars = '⭐'.repeat(details.rating)
+  const message = `New review received!
+
+${stars} (${details.rating}/5)
+Item: ${details.itemName}
+Booking: ${details.bookingNumber}
+From: ${details.reviewerName}
+
+Thank you for using RentHelper!`;
+  return sendWhatsAppText(recipientPhone, message);
 }
 
