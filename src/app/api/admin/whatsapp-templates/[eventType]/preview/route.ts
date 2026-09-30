@@ -5,14 +5,14 @@ import { PREVIEW_VALUES, EVENT_VARIABLES } from '@/lib/notifications/template-de
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { eventType: string } }
+  { params }: { params: Promise<{ eventType: string }> }
 ) {
   const session = await auth()
   if (!session || session.user?.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { eventType } = params
+  const { eventType } = await params
 
   if (!isValidEventType(eventType)) {
     return NextResponse.json({ error: 'Invalid event type' }, { status: 400 })

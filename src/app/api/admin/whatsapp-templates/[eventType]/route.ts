@@ -5,14 +5,14 @@ import { isValidEventType, validateTemplateVariables } from '@/lib/notifications
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { eventType: string } }
+  { params }: { params: Promise<{ eventType: string }> }
 ) {
   const session = await auth()
   if (!session || session.user?.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { eventType } = params
+  const { eventType } = await params
 
   if (!isValidEventType(eventType)) {
     return NextResponse.json({ error: 'Invalid event type' }, { status: 400 })
@@ -35,14 +35,14 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { eventType: string } }
+  { params }: { params: Promise<{ eventType: string }> }
 ) {
   const session = await auth()
   if (!session || session.user?.role !== 'admin') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { eventType } = params
+  const { eventType } = await params
 
   if (!isValidEventType(eventType)) {
     return NextResponse.json({ error: 'Invalid event type' }, { status: 400 })
