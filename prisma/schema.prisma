@@ -565,15 +565,21 @@ model SiteSettings {
   updatedAt             DateTime @updatedAt
   updatedBy             String?
 
-  // WhatsApp configuration
+  // WhatsApp configuration (legacy Meta fields — kept for migration safety)
   whatsappEnabled       Boolean  @default(false)
-  whatsappProvider      String   @default("meta")
+  whatsappProvider      String   @default("hostgrap") // meta, hostgrap
   whatsappBaseUrl       String?
   whatsappAccessToken   String?
   whatsappPhoneNumberId String?
   whatsappBusinessId    String?
   whatsappWebhookToken  String?
   whatsappCountryCode   String   @default("+94")
+
+  // HostGrap WhatsApp API V2
+  hostgrapEmail         String?
+  hostgrapApiKey        String?
+  hostgrapApiUrl        String   @default("https://wa-api.hostgrap.com")
+  hostgrapTestPhone     String?
 
   @@map("site_settings")
 }

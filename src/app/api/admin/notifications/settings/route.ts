@@ -12,23 +12,31 @@ export async function GET(req: NextRequest) {
     const settings = await prisma.siteSettings.findFirst();
 
     if (!settings) {
-      return NextResponse.json({});
+      return NextResponse.json({
+        whatsappEnabled: false,
+        hostgrapEmail: null,
+        hostgrapApiKey: null,
+        hostgrapApiUrl: 'https://wa-api.hostgrap.com',
+        hostgrapTestPhone: null,
+        whatsappCountryCode: '+94',
+      });
     }
 
-    let maskedToken = settings.whatsappAccessToken;
-    if (maskedToken && maskedToken.length > 4) {
-      maskedToken = '****' + maskedToken.slice(-4);
+    let maskedApiKey: string | null = null;
+    if (settings.hostgrapApiKey) {
+      maskedApiKey =
+        settings.hostgrapApiKey.length > 4
+          ? '****' + settings.hostgrapApiKey.slice(-4)
+          : '****';
     }
 
     return NextResponse.json({
-      whatsappEnabled: settings.whatsappEnabled,
-      whatsappProvider: settings.whatsappProvider,
-      whatsappBaseUrl: settings.whatsappBaseUrl,
-      whatsappPhoneNumberId: settings.whatsappPhoneNumberId,
-      whatsappBusinessId: settings.whatsappBusinessId,
-      whatsappWebhookToken: settings.whatsappWebhookToken,
-      whatsappCountryCode: settings.whatsappCountryCode,
-      whatsappAccessToken: maskedToken,
+      whatsappEnabled: Boolean(settings.whatsappEnabled),
+      hostgrapEmail: settings.hostgrapEmail ?? null,
+      hostgrapApiKey: maskedApiKey,
+      hostgrapApiUrl: settings.hostgrapApiUrl || 'https://wa-api.hostgrap.com',
+      hostgrapTestPhone: settings.hostgrapTestPhone ?? null,
+      whatsappCountryCode: settings.whatsappCountryCode || '+94',
     });
   } catch (error) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
@@ -45,27 +53,50 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
     const currentSettings = await prisma.siteSettings.findFirst();
 
-    let newAccessToken = body.whatsappAccessToken;
-    if (newAccessToken && newAccessToken.startsWith('****')) {
-      newAccessToken = currentSettings?.whatsappAccessToken;
+    let newApiKey = body.hostgrapApiKey;
+    if (typeof newApiKey === 'string' && newApiKey.startsWith('****')) {
+      newApiKey = currentSettings?.hostgrapApiKey ?? null;
+    } else if (newApiKey === undefined) {
+      newApiKey = currentSettings?.hostgrapApiKey ?? null;
+    } else if (newApiKey === '') {
+      newApiKey = null;
     }
 
     const data = {
-      whatsappEnabled: body.whatsappEnabled,
-      whatsappProvider: body.whatsappProvider,
-      whatsappBaseUrl: body.whatsappBaseUrl,
-      whatsappPhoneNumberId: body.whatsappPhoneNumberId,
-      whatsappBusinessId: body.whatsappBusinessId,
-      whatsappWebhookToken: body.whatsappWebhookToken,
-      whatsappCountryCode: body.whatsappCountryCode,
-      whatsappAccessToken: newAccessToken,
+      whatsappEnabled: Boolean(body.whatsappEnabled),
+      whatsappProvider: 'hostgrap',
+      hostgrapEmail: body.hostgrapEmail ?? null,
+      hostgrapApiKey: newApiKey,
+      hostgrapApiUrl: body.hostgrapApiUrl || 'https://wa-api.hostgrap.com',
+      hostgrapTestPhone: body.hostgrapTestPhone ?? null,
+      whatsappCountryCode: body.whatsappCountryCode || '+94',
     };
 
     const updated = currentSettings
-      ? await prisma.siteSettings.update({ where: { id: currentSettings.id }, data })
-      : await prisma.siteSettings.create({ data });
+      ? await prisma.siteSettings.update({
+          where: { id: currentSettings.id },
+          data,
+        })
+      : await prisma.siteSettings.create({
+          data,
+        });
 
-    return NextResponse.json(updated);
+    let maskedApiKey: string | null = null;
+    if (updated.hostgrapApiKey) {
+      maskedApiKey =
+        updated.hostgrapApiKey.length > 4
+          ? '****' + updated.hostgrapApiKey.slice(-4)
+          : '****';
+    }
+
+    return NextResponse.json({
+      whatsappEnabled: updated.whatsappEnabled,
+      hostgrapEmail: updated.hostgrapEmail,
+      hostgrapApiKey: maskedApiKey,
+      hostgrapApiUrl: updated.hostgrapApiUrl,
+      hostgrapTestPhone: updated.hostgrapTestPhone,
+      whatsappCountryCode: updated.whatsappCountryCode,
+    });
   } catch (error) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }

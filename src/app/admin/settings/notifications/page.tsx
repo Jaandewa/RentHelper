@@ -3,14 +3,12 @@
 import { useEffect, useState } from 'react'
 import { MessageSquare, Send, Eye, EyeOff, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react'
 
-interface WhatsAppConfig {
+interface HostGrapConfig {
   whatsappEnabled: boolean
-  whatsappProvider: string
-  whatsappBaseUrl: string
-  whatsappAccessToken: string
-  whatsappPhoneNumberId: string
-  whatsappBusinessId: string
-  whatsappWebhookToken: string
+  hostgrapEmail: string
+  hostgrapApiKey: string
+  hostgrapApiUrl: string
+  hostgrapTestPhone: string
   whatsappCountryCode: string
 }
 
@@ -26,23 +24,20 @@ interface DeliveryLog {
 }
 
 export default function NotificationSettingsPage() {
-  const [config, setConfig] = useState<WhatsAppConfig>({
+  const [config, setConfig] = useState<HostGrapConfig>({
     whatsappEnabled: false,
-    whatsappProvider: 'meta',
-    whatsappBaseUrl: 'https://graph.facebook.com/v17.0',
-    whatsappAccessToken: '',
-    whatsappPhoneNumberId: '',
-    whatsappBusinessId: '',
-    whatsappWebhookToken: '',
+    hostgrapEmail: '',
+    hostgrapApiKey: '',
+    hostgrapApiUrl: 'https://wa-api.hostgrap.com',
+    hostgrapTestPhone: '',
     whatsappCountryCode: '+94',
   })
   const [logs, setLogs] = useState<DeliveryLog[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [testPhone, setTestPhone] = useState('')
-  const [testMessage, setTestMessage] = useState('Hello from RentHelper! This is a test message.')
+  const [sendingTest, setSendingTest] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
-  const [showToken, setShowToken] = useState(false)
+  const [showApiKey, setShowApiKey] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -55,7 +50,14 @@ export default function NotificationSettingsPage() {
       const res = await fetch('/api/admin/notifications/settings')
       if (res.ok) {
         const data = await res.json()
-        setConfig(data)
+        setConfig(prev => ({
+          whatsappEnabled: data.whatsappEnabled ?? prev.whatsappEnabled,
+          hostgrapEmail: data.hostgrapEmail ?? '',
+          hostgrapApiKey: data.hostgrapApiKey ?? '',
+          hostgrapApiUrl: data.hostgrapApiUrl || 'https://wa-api.hostgrap.com',
+          hostgrapTestPhone: data.hostgrapTestPhone ?? '',
+          whatsappCountryCode: data.whatsappCountryCode || '+94',
+        }))
       }
     } catch {
       // Use defaults
@@ -96,19 +98,24 @@ export default function NotificationSettingsPage() {
   }
 
   const sendTest = async () => {
+    setSendingTest(true)
     setTestResult(null)
     try {
       const res = await fetch('/api/admin/notifications/test-whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: testPhone, message: testMessage }),
+        body: JSON.stringify({}),
       })
       const data = await res.json()
-      setTestResult({ success: res.ok, message: data.message || data.error || 'Unknown result' })
+      setTestResult({
+        success: res.ok && data.success !== false,
+        message: data.message || data.error || (res.ok ? 'Test message sent successfully' : 'Failed to send test message'),
+      })
       await loadLogs()
     } catch {
       setTestResult({ success: false, message: 'Network error' })
     }
+    setSendingTest(false)
   }
 
   const statusIcon = (status: string) => {
@@ -136,89 +143,154 @@ export default function NotificationSettingsPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        {/* WhatsApp Configuration */}
+        {/* HostGrap WhatsApp Configuration */}
         <div className="admin-card" style={{ gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
             <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(37,211,102,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <MessageSquare size={20} color="#25D366" />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#f1f5f9' }}>WhatsApp Business API</p>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Meta Cloud API integration</p>
+              <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#f1f5f9' }}>HostGrap WhatsApp API V2</p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Configure HostGrap WhatsApp gateway for notifications</p>
             </div>
             <label className="admin-toggle" style={{ marginLeft: 'auto' }}>
-              <input type="checkbox" checked={config.whatsappEnabled} onChange={e => setConfig({ ...config, whatsappEnabled: e.target.checked })} />
+              <input
+                type="checkbox"
+                checked={config.whatsappEnabled}
+                onChange={e => setConfig({ ...config, whatsappEnabled: e.target.checked })}
+              />
               <span className="admin-toggle__slider" />
             </label>
           </div>
 
           <div className="admin-form-row" style={{ marginBottom: '16px' }}>
             <div className="admin-form-group">
-              <label className="admin-form-label">API Base URL</label>
-              <input className="admin-form-input" value={config.whatsappBaseUrl || ''} onChange={e => setConfig({ ...config, whatsappBaseUrl: e.target.value })} placeholder="https://graph.facebook.com/v17.0" />
+              <label className="admin-form-label">Registered Email</label>
+              <input
+                type="email"
+                className="admin-form-input"
+                value={config.hostgrapEmail}
+                onChange={e => setConfig({ ...config, hostgrapEmail: e.target.value })}
+                placeholder="e.g. user@example.com"
+              />
             </div>
             <div className="admin-form-group">
-              <label className="admin-form-label">Provider</label>
-              <select className="admin-form-select" value={config.whatsappProvider} onChange={e => setConfig({ ...config, whatsappProvider: e.target.value })}>
-                <option value="meta">Meta Business API</option>
-                <option value="twilio">Twilio</option>
-                <option value="dialog">Dialog (Sri Lanka)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="admin-form-row" style={{ marginBottom: '16px' }}>
-            <div className="admin-form-group">
-              <label className="admin-form-label">Access Token / API Key</label>
+              <label className="admin-form-label">API Key</label>
               <div style={{ position: 'relative' }}>
-                <input className="admin-form-input" type={showToken ? 'text' : 'password'} value={config.whatsappAccessToken || ''} onChange={e => setConfig({ ...config, whatsappAccessToken: e.target.value })} placeholder="Enter access token" style={{ paddingRight: '40px' }} />
-                <button onClick={() => setShowToken(!showToken)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}>
-                  {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                <input
+                  className="admin-form-input"
+                  type={showApiKey ? 'text' : 'password'}
+                  value={config.hostgrapApiKey}
+                  onChange={e => setConfig({ ...config, hostgrapApiKey: e.target.value })}
+                  placeholder="Enter HostGrap API key"
+                  style={{ paddingRight: '40px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                  }}
+                  aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                >
+                  {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="admin-form-row" style={{ marginBottom: '16px' }}>
             <div className="admin-form-group">
-              <label className="admin-form-label">Phone Number ID</label>
-              <input className="admin-form-input" value={config.whatsappPhoneNumberId || ''} onChange={e => setConfig({ ...config, whatsappPhoneNumberId: e.target.value })} placeholder="e.g. 123456789012345" />
+              <label className="admin-form-label">API URL</label>
+              <input
+                type="text"
+                className="admin-form-input"
+                value={config.hostgrapApiUrl}
+                onChange={e => setConfig({ ...config, hostgrapApiUrl: e.target.value })}
+                placeholder="https://wa-api.hostgrap.com"
+              />
+            </div>
+            <div className="admin-form-group">
+              <label className="admin-form-label">Country Code</label>
+              <input
+                type="text"
+                className="admin-form-input"
+                value={config.whatsappCountryCode}
+                onChange={e => setConfig({ ...config, whatsappCountryCode: e.target.value })}
+                placeholder="+94"
+              />
             </div>
           </div>
 
           <div className="admin-form-row" style={{ marginBottom: '16px' }}>
             <div className="admin-form-group">
-              <label className="admin-form-label">Business Account ID</label>
-              <input className="admin-form-input" value={config.whatsappBusinessId || ''} onChange={e => setConfig({ ...config, whatsappBusinessId: e.target.value })} placeholder="Optional" />
-            </div>
-            <div className="admin-form-group">
-              <label className="admin-form-label">Default Country Code</label>
-              <input className="admin-form-input" value={config.whatsappCountryCode || '+94'} onChange={e => setConfig({ ...config, whatsappCountryCode: e.target.value })} placeholder="+94" />
+              <label className="admin-form-label">Test Phone Number</label>
+              <input
+                type="text"
+                className="admin-form-input"
+                value={config.hostgrapTestPhone}
+                onChange={e => setConfig({ ...config, hostgrapTestPhone: e.target.value })}
+                placeholder="947XXXXXXXX"
+              />
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            {saved && <span style={{ color: '#34d399', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={14} /> Saved</span>}
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center' }}>
+            {saved && (
+              <span style={{ color: '#34d399', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle size={14} /> Saved
+              </span>
+            )}
             <button className="admin-btn admin-btn--primary" onClick={saveSettings} disabled={saving}>
               {saving ? 'Saving...' : 'Save Settings'}
             </button>
           </div>
         </div>
 
-        {/* Test Message */}
+        {/* Send Test Message */}
         <div className="admin-card">
-          <p style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0', margin: '0 0 16px' }}>Send Test Message</p>
-          <div className="admin-form-group">
-            <label className="admin-form-label">Phone Number</label>
-            <input className="admin-form-input" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="e.g. 0771234567" />
+          <p style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0', margin: '0 0 16px' }}>
+            Send Test Message
+          </p>
+          <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 14px', lineHeight: '1.5' }}>
+            Sends a test notification to the configured test phone number: <strong style={{ color: '#f1f5f9' }}>{config.hostgrapTestPhone || 'Not configured'}</strong>.
+          </p>
+          <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px', fontSize: '13px', color: '#cbd5e1' }}>
+            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', display: 'block', marginBottom: '4px' }}>Test Message</span>
+            RentHelper WhatsApp test message. If you received this message, HostGrap WhatsApp integration is working.
           </div>
-          <div className="admin-form-group">
-            <label className="admin-form-label">Message</label>
-            <textarea className="admin-form-textarea" value={testMessage} onChange={e => setTestMessage(e.target.value)} rows={3} />
-          </div>
-          <button className="admin-btn admin-btn--success" onClick={sendTest} disabled={!testPhone} style={{ width: '100%' }}>
-            <Send size={14} /> Send Test WhatsApp
+          <button
+            className="admin-btn admin-btn--success"
+            onClick={sendTest}
+            disabled={sendingTest}
+            style={{ width: '100%' }}
+          >
+            <Send size={14} /> {sendingTest ? 'Sending...' : 'Send Test Message'}
           </button>
           {testResult && (
-            <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '8px', background: testResult.success ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${testResult.success ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`, fontSize: '13px', color: testResult.success ? '#34d399' : '#f87171' }}>
-              {testResult.success ? <CheckCircle size={14} style={{ display: 'inline', marginRight: '6px' }} /> : <XCircle size={14} style={{ display: 'inline', marginRight: '6px' }} />}
+            <div
+              style={{
+                marginTop: '12px',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                background: testResult.success ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+                border: `1px solid ${testResult.success ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                fontSize: '13px',
+                color: testResult.success ? '#34d399' : '#f87171',
+              }}
+            >
+              {testResult.success ? (
+                <CheckCircle size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }} />
+              ) : (
+                <XCircle size={14} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }} />
+              )}
               {testResult.message}
             </div>
           )}

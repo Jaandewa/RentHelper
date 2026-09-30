@@ -1,19 +1,65 @@
 import prisma from '@/lib/prisma'
 
 /**
+ * HostGrap WhatsApp API V2 Adapter
+ * 
+ * Sends text messages via HostGrap's send-message endpoint.
+ * Credentials: env vars first (HOSTGRAP_*), DB SiteSettings fallback.
+ * All helper functions below construct plain text and call sendWhatsAppText().
+ */
+
+/**
  * Formats a phone number for WhatsApp API (E.164 without +).
  * Handles: 0771234567 → 94771234567, +94771234567 → 94771234567, 94771234567 → 94771234567
  */
 function formatPhoneForWhatsApp(phone: string, countryCode: string = '+94'): string {
   let cleaned = phone.replace(/[\s\-()]/g, '')
-  // Remove leading +
   if (cleaned.startsWith('+')) cleaned = cleaned.slice(1)
-  // Replace leading 0 with country code digits
   const codeDigits = countryCode.replace('+', '')
   if (cleaned.startsWith('0')) cleaned = codeDigits + cleaned.slice(1)
-  // If number doesn't start with country code, prepend it
   if (!cleaned.startsWith(codeDigits)) cleaned = codeDigits + cleaned
   return cleaned
+}
+
+/**
+ * Resolves HostGrap credentials from env vars first, then DB SiteSettings.
+ */
+export async function getHostGrapConfig(): Promise<{
+  enabled: boolean
+  email: string | null
+  apiKey: string | null
+  apiUrl: string
+  testPhone: string | null
+  countryCode: string
+}> {
+  // Env vars take priority
+  const envEnabled = process.env.HOSTGRAP_WHATSAPP_ENABLED === 'true'
+  const envEmail = process.env.HOSTGRAP_EMAIL || null
+  const envApiKey = process.env.HOSTGRAP_API_KEY || null
+  const envApiUrl = process.env.HOSTGRAP_API_URL || null
+  const envTestPhone = process.env.HOSTGRAP_TEST_PHONE || null
+
+  if (envEnabled && envEmail && envApiKey) {
+    return {
+      enabled: true,
+      email: envEmail,
+      apiKey: envApiKey,
+      apiUrl: envApiUrl || 'https://wa-api.hostgrap.com',
+      testPhone: envTestPhone,
+      countryCode: '+94',
+    }
+  }
+
+  // Fallback to DB settings
+  const settings = await prisma.siteSettings.findFirst()
+  return {
+    enabled: settings?.whatsappEnabled ?? false,
+    email: settings?.hostgrapEmail || null,
+    apiKey: settings?.hostgrapApiKey || null,
+    apiUrl: settings?.hostgrapApiUrl || 'https://wa-api.hostgrap.com',
+    testPhone: settings?.hostgrapTestPhone || null,
+    countryCode: settings?.whatsappCountryCode || '+94',
+  }
 }
 
 export interface WhatsAppSendParams {
@@ -57,90 +103,106 @@ export async function sendWhatsAppText(
   }
 
   try {
-    const settings = await prisma.siteSettings.findFirst()
+    const config = await getHostGrapConfig()
 
-    // Format phone number with country code from settings
-    targetPhone = formatPhoneForWhatsApp(targetPhone, settings?.whatsappCountryCode || '+94')
+    // Format phone number
+    targetPhone = formatPhoneForWhatsApp(targetPhone, config.countryCode)
 
-    if (!settings?.whatsappEnabled) {
-      // Log as not configured
+    if (!config.enabled) {
       await prisma.notificationDelivery.create({
         data: {
           type: 'whatsapp_text',
           recipient: targetPhone,
           channel: 'whatsapp',
           status: 'not_configured',
-          error: 'WhatsApp integration is disabled in settings',
+          error: 'WhatsApp integration is disabled',
           sentAt: new Date(),
         },
       }).catch(() => {})
       return { success: false, reason: 'not_configured' }
     }
 
-    const baseUrl = settings.whatsappBaseUrl || 'https://graph.facebook.com/v17.0'
-    const phoneNumberId = settings.whatsappPhoneNumberId
-    const accessToken = settings.whatsappAccessToken
-
-    if (!phoneNumberId || !accessToken) {
+    if (!config.email || !config.apiKey) {
       await prisma.notificationDelivery.create({
         data: {
           type: 'whatsapp_text',
           recipient: targetPhone,
           channel: 'whatsapp',
           status: 'not_configured',
-          error: 'Missing Phone Number ID or Access Token',
+          error: 'Missing HostGrap email or API key',
           sentAt: new Date(),
         },
       }).catch(() => {})
       return { success: false, reason: 'not_configured' }
     }
 
-    const url = `${baseUrl}/${phoneNumberId}/messages`
-    const body = {
-      messaging_product: 'whatsapp',
-      to: targetPhone,
-      type: 'text',
-      text: { body: targetMessage },
-    }
+    // Build HostGrap API request (application/x-www-form-urlencoded)
+    const url = `${config.apiUrl}/api/send-message.php`
+    const body = new URLSearchParams({
+      email: config.email,
+      api_key: config.apiKey,
+      phone: targetPhone,
+      message: targetMessage,
+    })
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+      signal: AbortSignal.timeout(15000),
     })
 
-    const data = await res.json()
+    // Parse response — HostGrap may return JSON or plain text
+    let responseData: any = null
+    let responseText = ''
+    try {
+      responseText = await res.text()
+      responseData = JSON.parse(responseText)
+    } catch {
+      responseData = { raw: responseText }
+    }
+
+    const isSuccess = res.ok && (responseData?.status === 'success' || responseData?.status === true || res.status === 200)
+
+    // Sanitize response for logging — never store API key
+    const sanitizedResponse = responseData ? JSON.stringify(responseData).slice(0, 500) : null
 
     await prisma.notificationDelivery.create({
       data: {
         type: 'whatsapp_text',
         recipient: targetPhone,
         channel: 'whatsapp',
-        status: res.ok ? 'sent' : 'failed',
-        error: res.ok ? null : JSON.stringify(data),
+        status: isSuccess ? 'sent' : 'failed',
+        error: isSuccess ? null : (responseData?.message || responseData?.error || sanitizedResponse || `HTTP ${res.status}`),
         sentAt: new Date(),
       },
     }).catch(() => {})
 
-    return { success: res.ok, data }
+    return {
+      success: isSuccess,
+      providerMessageId: responseData?.message_id || responseData?.id || undefined,
+      providerResponse: responseData,
+      ...(isSuccess ? {} : { error: responseData?.message || responseData?.error || `HTTP ${res.status}` }),
+    }
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+
     await prisma.notificationDelivery.create({
       data: {
         type: 'whatsapp_text',
         recipient: targetPhone,
         channel: 'whatsapp',
         status: 'failed',
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMsg.slice(0, 500),
         sentAt: new Date(),
       },
     }).catch(() => {})
 
-    return { success: false, error: 'Request failed' }
+    return { success: false, error: errorMsg.includes('TimeoutError') ? 'Request timed out (15s)' : 'Request failed' }
   }
 }
+
+// ── Message Helpers (construct text + call sendWhatsAppText) ──────────────
 
 export async function sendKycApprovedWhatsApp(
   param1: string | KycApprovedParams,
@@ -293,4 +355,3 @@ From: ${details.reviewerName}
 Thank you for using RentHelper!`;
   return sendWhatsAppText(recipientPhone, message);
 }
-
