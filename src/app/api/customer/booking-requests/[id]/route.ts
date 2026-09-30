@@ -25,7 +25,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         bookingItems: { include: { item: true } },
         business: true,
         ad: true,
-        payments: true
+        payments: true,
+        providerRating: true,
       }
     })
 

@@ -95,6 +95,8 @@ model Business {
   approvalNote           String?
   approvedBy             String?
   approvedAt             DateTime?
+  averageRating          Float     @default(0)
+  totalReviews           Int       @default(0)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
@@ -165,6 +167,8 @@ model CustomerProfile {
   allowCrossProviderShare Boolean   @default(true)
   trustScore              Float     @default(0)
   totalBookings           Int       @default(0)
+  averageRating           Float     @default(0)
+  totalReviews            Int       @default(0)
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
@@ -324,6 +328,8 @@ model Booking {
   invoices        Invoice[]
   customerRating  CustomerRating?
   providerRating  ProviderRating?
+  customerReviewed Boolean        @default(false)
+  providerReviewed Boolean        @default(false)
   ad              RentalAd?        @relation(fields: [adId], references: [id])
 
   @@index([businessId])

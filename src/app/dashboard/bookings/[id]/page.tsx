@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Check, X, CreditCard, Calendar, Truck, User, FileText, CheckCircle2, Package, Clock, AlertCircle, Shield, MapPin } from 'lucide-react'
+import { ArrowLeft, Check, X, CreditCard, Calendar, Truck, User, FileText, CheckCircle2, Package, Clock, AlertCircle, Shield, MapPin, Star } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_STYLES: Record<string, string> = {
@@ -43,6 +43,14 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [showAcceptModal, setShowAcceptModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+
+  // Review states
+  const [reviewRating, setReviewRating] = useState(0)
+  const [reviewText, setReviewText] = useState('')
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
+  const [reviewSuccess, setReviewSuccess] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+  const [hoverStar, setHoverStar] = useState(0)
 
   // Feedback states
   const [successMsg, setSuccessMsg] = useState('')
@@ -115,6 +123,34 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       setErrorMsg('An error occurred while rejecting')
     } finally {
       setProcessing(false)
+    }
+  }
+
+  const handleSubmitReview = async () => {
+    if (reviewRating === 0) {
+      setReviewError('Please select a star rating')
+      return
+    }
+    setReviewSubmitting(true)
+    setReviewError('')
+    try {
+      const res = await fetch(`/api/provider/bookings/${id}/review-customer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: reviewRating, reviewText: reviewText.trim() || undefined }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setReviewSuccess(true)
+        const updated = await fetch(`/api/orders/${id}`).then(r => r.json())
+        setBooking(updated)
+      } else {
+        setReviewError(data.error || 'Failed to submit review')
+      }
+    } catch {
+      setReviewError('An error occurred')
+    } finally {
+      setReviewSubmitting(false)
     }
   }
 
@@ -411,6 +447,59 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </span>
             </div>
           </div>
+
+          {/* Rate Customer Section */}
+          {booking.status === 'completed' && !booking.providerReviewed && !booking.customerRating && !reviewSuccess && (
+            <div className="bg-white rounded-xl border-2 border-amber-200 shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                <Star className="w-5 h-5 text-amber-400" /> Rate This Customer
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">How was your experience with <strong>{booking.customer?.user?.name || 'this customer'}</strong>?</p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Your Rating *</label>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button key={star} type="button" className="transition-transform hover:scale-110" onMouseEnter={() => setHoverStar(star)} onMouseLeave={() => setHoverStar(0)} onClick={() => setReviewRating(star)}>
+                        <Star className={`w-8 h-8 ${star <= (hoverStar || reviewRating) ? 'fill-amber-400 text-amber-400' : 'fill-none text-gray-300'}`} />
+                      </button>
+                    ))}
+                  </div>
+                  {reviewRating > 0 && <p className="text-sm text-gray-500 mt-1">{reviewRating === 5 ? 'Excellent!' : reviewRating === 4 ? 'Very Good' : reviewRating === 3 ? 'Average' : reviewRating === 2 ? 'Below Average' : 'Poor'}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Write a Review (optional)</label>
+                  <textarea className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:outline-none" placeholder="Share your experience with this customer..." rows={3} maxLength={500} value={reviewText} onChange={e => setReviewText(e.target.value)} />
+                  <p className="text-xs text-gray-400 mt-1">{reviewText.length}/500</p>
+                </div>
+                {reviewError && <div className="flex items-center gap-2 text-red-600 text-sm"><AlertCircle className="w-4 h-4" /> {reviewError}</div>}
+                <button onClick={handleSubmitReview} disabled={reviewSubmitting || reviewRating === 0} className="px-6 py-2.5 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-2">
+                  {reviewSubmitting ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Submitting...</>) : (<><Star className="w-4 h-4" /> Submit Review</>)}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Review Submitted */}
+          {(reviewSuccess || booking.providerReviewed || booking.customerRating) && (
+            <div className="bg-green-50 rounded-xl border border-green-200 shadow-sm p-6">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-semibold text-green-900">Customer Review Submitted</h3>
+                  {booking.customerRating && (
+                    <div className="mt-2">
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5].map(s => <Star key={s} className={`w-4 h-4 ${s <= Math.round(booking.customerRating.overallScore) ? 'fill-amber-400 text-amber-400' : 'fill-none text-gray-300'}`} />)}
+                        <span className="text-sm text-gray-600">{booking.customerRating.overallScore}/5</span>
+                      </div>
+                      {booking.customerRating.review && <p className="mt-2 text-sm text-gray-700 italic">"{booking.customerRating.review}"</p>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Loader2, Calendar, Filter } from 'lucide-react'
+import { Loader2, Calendar, Filter, Star } from 'lucide-react'
 
 export default function CustomerBookingsPage() {
   const router = useRouter()
@@ -117,6 +117,13 @@ export default function CustomerBookingsPage() {
                     <Link href={`/customer/bookings/${booking.id}/pay-advance`}>
                       <button className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors">
                         Pay Advance
+                      </button>
+                    </Link>
+                  )}
+                  {booking.status === 'completed' && !booking.customerReviewed && !booking.providerRating && (
+                    <Link href={`/customer/bookings/${booking.id}`}>
+                      <button className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
+                        <Star className="w-3.5 h-3.5" /> Rate Provider
                       </button>
                     </Link>
                   )}

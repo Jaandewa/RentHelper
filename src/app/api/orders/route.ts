@@ -35,6 +35,7 @@ export async function GET(req: Request) {
         customer: { include: { user: { select: { name: true, email: true } } } },
         bookingItems: { include: { item: { select: { name: true } } } },
         payments: true,
+        customerRating: true,
       },
       orderBy: { createdAt: 'desc' },
     })

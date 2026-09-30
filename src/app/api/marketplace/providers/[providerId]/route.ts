@@ -25,6 +25,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pro
         phone: true,
         currency: true,
         approvalStatus: true,
+        averageRating: true,
+        totalReviews: true,
         createdAt: true,
         rentalAds: {
           where: {
