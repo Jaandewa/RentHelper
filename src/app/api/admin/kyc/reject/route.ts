@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/admin-guard'
 import { sendKycDecisionNotification } from '@/lib/notifications/service'
+import { VALID_REASON_CODES, getReasonByCode, buildFinalReason } from '@/lib/kyc-rejection-reasons'
+
+const MAX_NOTE_LENGTH = 500
 
 export async function POST(req: NextRequest) {
   const { error, session } = await requireAdmin()
@@ -9,15 +12,24 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { customerId, reason } = body
+    const { customerId, reasonCode, additionalNote } = body
 
     if (!customerId) {
       return NextResponse.json({ message: 'customerId is required' }, { status: 400 })
     }
 
-    if (!reason || typeof reason !== 'string' || !reason.trim()) {
-      return NextResponse.json({ message: 'Rejection reason is mandatory' }, { status: 400 })
+    // Validate reason code against server-side allow-list
+    if (!reasonCode || !VALID_REASON_CODES.includes(reasonCode)) {
+      return NextResponse.json({ message: 'Please select a valid rejection reason.' }, { status: 400 })
     }
+
+    // If OTHER, additional note is mandatory
+    if (reasonCode === 'OTHER' && (!additionalNote || !additionalNote.trim())) {
+      return NextResponse.json({ message: 'Additional note is required when selecting "Other reason".' }, { status: 400 })
+    }
+
+    // Validate additional note length
+    const sanitizedNote = additionalNote?.trim().slice(0, MAX_NOTE_LENGTH) || null
 
     const customer = await prisma.customerProfile.findUnique({
       where: { id: customerId },
@@ -28,12 +40,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Customer profile not found' }, { status: 404 })
     }
 
+    // Ensure KYC is in a rejectable state
+    if (customer.kycStatus === 'rejected') {
+      return NextResponse.json({ message: 'This KYC submission has already been rejected.' }, { status: 400 })
+    }
+
+    // Build final customer-facing reason server-side
+    const finalReason = buildFinalReason(reasonCode, sanitizedNote || undefined)
+    const reasonLabel = getReasonByCode(reasonCode)?.label || reasonCode
+
     // Update customer KYC status
     await prisma.customerProfile.update({
       where: { id: customerId },
       data: {
         kycStatus: 'rejected',
-        kycRejectionReason: reason.trim(),
+        kycRejectionReason: finalReason,
+        kycRejectionReasonCode: reasonCode,
       },
     })
 
@@ -43,12 +65,12 @@ export async function POST(req: NextRequest) {
         customerId,
         action: 'rejected',
         performedBy: session!.user.id,
-        notes: reason.trim(),
+        notes: sanitizedNote ? `${reasonLabel}. ${sanitizedNote}` : reasonLabel,
       },
     })
 
     // Unified notification: in-app + WhatsApp delivery log
-    sendKycDecisionNotification(customerId, 'rejected', reason.trim()).catch(e =>
+    sendKycDecisionNotification(customerId, 'rejected', finalReason).catch(e =>
       console.error('[Notification] KYC rejection notification error:', e)
     )
 

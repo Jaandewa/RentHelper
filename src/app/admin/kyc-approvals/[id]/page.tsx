@@ -4,6 +4,7 @@ import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Shield, CheckCircle, XCircle, AlertCircle, FileText, Calendar, Phone, MapPin, User, ExternalLink } from 'lucide-react'
+import { KYC_REJECTION_REASONS } from '@/lib/kyc-rejection-reasons'
 
 interface CustomerDetail {
   id: string
@@ -37,7 +38,9 @@ export default function KycDetailReviewPage({ params }: { params: Promise<{ id: 
   const [infoModalOpen, setInfoModalOpen] = useState(false)
 
   const [adminNote, setAdminNote] = useState('')
-  const [rejectReason, setRejectReason] = useState('')
+  const [rejectReasonCode, setRejectReasonCode] = useState('')
+  const [rejectAdditionalNote, setRejectAdditionalNote] = useState('')
+  const [rejectError, setRejectError] = useState('')
   const [infoMessage, setInfoMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -81,26 +84,35 @@ export default function KycDetailReviewPage({ params }: { params: Promise<{ id: 
   }
 
   const handleReject = async () => {
-    if (!rejectReason.trim()) {
-      alert('Please enter a rejection reason')
+    if (!rejectReasonCode) {
+      setRejectError('Please select a rejection reason.')
       return
     }
+    if (rejectReasonCode === 'OTHER' && !rejectAdditionalNote.trim()) {
+      setRejectError('Additional note is required when selecting "Other reason".')
+      return
+    }
+    setRejectError('')
     setSubmitting(true)
     try {
       const res = await fetch('/api/admin/kyc/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId: id, reason: rejectReason.trim() }),
+        body: JSON.stringify({
+          customerId: id,
+          reasonCode: rejectReasonCode,
+          additionalNote: rejectAdditionalNote.trim() || undefined,
+        }),
       })
       if (res.ok) {
         setRejectModalOpen(false)
         router.push('/admin/kyc-approvals')
       } else {
         const data = await res.json()
-        alert(data.message || 'Failed to reject KYC')
+        setRejectError(data.message || 'Failed to reject KYC')
       }
     } catch {
-      alert('Network error')
+      setRejectError('Network error')
     }
     setSubmitting(false)
   }
@@ -364,33 +376,72 @@ export default function KycDetailReviewPage({ params }: { params: Promise<{ id: 
         </div>
       )}
 
-      {/* REJECT MODAL */}
       {rejectModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <XCircle className="w-6 h-6 text-red-600" /> Reject Customer KYC
+              <XCircle className="w-6 h-6 text-red-600" /> Reject KYC Verification
             </h3>
-            <p className="text-sm text-gray-600">
-              Please state the reason for rejecting this verification request. This reason will be shown to the customer when they attempt to re-login.
-            </p>
+
+            {customer && (
+              <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                <p className="text-gray-700"><span className="font-medium">Customer:</span> {customer.user.name}</p>
+                <p className="text-gray-500 text-xs">ID: {customer.id}</p>
+              </div>
+            )}
+
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Rejection Reason *</label>
+              <label htmlFor="reject-reason-select" className="block text-xs font-medium text-gray-700 mb-1">Rejection reason <span className="text-red-500">*</span></label>
+              <select
+                id="reject-reason-select"
+                value={rejectReasonCode}
+                onChange={e => { setRejectReasonCode(e.target.value); setRejectError('') }}
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-red-500 bg-white"
+              >
+                <option value="">Select a reason</option>
+                {KYC_REJECTION_REASONS.map(r => (
+                  <option key={r.code} value={r.code}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="reject-additional-note" className="block text-xs font-medium text-gray-700 mb-1">
+                Additional note {rejectReasonCode === 'OTHER' ? <span className="text-red-500">*</span> : '(optional)'}
+              </label>
               <textarea
+                id="reject-additional-note"
                 rows={3}
-                required
-                placeholder="e.g. Front document photo is blurry and illegible."
-                value={rejectReason}
-                onChange={e => setRejectReason(e.target.value)}
+                maxLength={500}
+                placeholder="e.g. Please upload a brighter photo with all corners visible."
+                value={rejectAdditionalNote}
+                onChange={e => setRejectAdditionalNote(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-red-500"
               />
+              <p className="text-xs text-gray-400 mt-0.5 text-right">{rejectAdditionalNote.length}/500</p>
             </div>
+
+            <p className="text-xs text-gray-500">
+              The customer will receive this reason through their dashboard and WhatsApp notification if WhatsApp is enabled.
+            </p>
+
+            {rejectError && (
+              <p className="text-sm text-red-600 font-medium">{rejectError}</p>
+            )}
+
             <div className="flex gap-3 justify-end pt-2">
-              <button onClick={() => setRejectModalOpen(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">
+              <button
+                onClick={() => { setRejectModalOpen(false); setRejectError(''); setRejectReasonCode(''); setRejectAdditionalNote('') }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
                 Cancel
               </button>
-              <button onClick={handleReject} disabled={submitting} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">
-                {submitting ? 'Rejecting...' : 'Confirm Rejection'}
+              <button
+                onClick={handleReject}
+                disabled={submitting || !rejectReasonCode}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Rejecting...' : 'Reject KYC'}
               </button>
             </div>
           </div>

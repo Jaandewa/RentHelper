@@ -166,6 +166,7 @@ model CustomerProfile {
   accountStatus           String    @default("incomplete") // incomplete, pending_approval, active, rejected, suspended
   kycSubmittedAt          DateTime?
   kycRejectionReason      String?
+  kycRejectionReasonCode  String?   // ID_FRONT_UNCLEAR, ID_BACK_UNCLEAR, SELFIE_ID_MISMATCH, OTHER, etc.
   allowCrossProviderShare Boolean   @default(true)
   trustScore              Float     @default(0)
   totalBookings           Int       @default(0)
