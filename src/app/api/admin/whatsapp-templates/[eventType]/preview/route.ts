@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { isValidEventType, previewTemplate } from '@/lib/notifications/template-renderer'
-import { PREVIEW_VALUES, EVENT_VARIABLES } from '@/lib/notifications/template-defaults'
+import { PREVIEW_VALUES } from '@/lib/notifications/template-defaults'
 
 export async function POST(
   req: NextRequest,
@@ -15,7 +15,7 @@ export async function POST(
   const { eventType } = await params
 
   if (!isValidEventType(eventType)) {
-    return NextResponse.json({ error: 'Invalid event type' }, { status: 400 })
+    return NextResponse.json({ success: false, error: 'Invalid event type' }, { status: 400 })
   }
 
   try {
@@ -23,14 +23,19 @@ export async function POST(
     const { messageBody } = body
 
     if (typeof messageBody !== 'string') {
-      return NextResponse.json({ error: 'messageBody is required and must be a string' }, { status: 400 })
+      return NextResponse.json({ success: false, error: 'messageBody is required and must be a string' }, { status: 400 })
     }
 
     const previewResult = previewTemplate(messageBody, eventType, PREVIEW_VALUES)
     
-    return NextResponse.json(previewResult) // { rendered, unsupportedVars }
+    // Return shape the UI expects: { success, message, unsupportedVars }
+    return NextResponse.json({
+      success: true,
+      message: previewResult.rendered,
+      unsupportedVars: previewResult.unsupportedVars,
+    })
   } catch (error) {
-    console.error(error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error('[WhatsApp Templates API] Preview error:', error)
+    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 })
   }
 }

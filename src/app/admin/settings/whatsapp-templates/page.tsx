@@ -47,12 +47,35 @@ export default function WhatsappTemplatesPage() {
       const res = await fetch('/api/admin/whatsapp-templates')
       if (res.ok) {
         const data = await res.json()
-        setTemplates(data.templates || [])
+        // Ensure variables is always an array of { name, description }
+        const parsed = (data.templates || []).map((t: any) => ({
+          ...t,
+          variables: parseVariables(t.variables),
+        }))
+        setTemplates(parsed)
       }
     } catch (e) {
       console.error(e)
     }
     setLoading(false)
+  }
+
+  /** Safely parse variables into { name, description }[] */
+  const parseVariables = (raw: any): TemplateVariable[] => {
+    if (Array.isArray(raw)) {
+      return raw.map((v: any) => {
+        if (typeof v === 'string') return { name: v, description: v }
+        if (v && typeof v === 'object' && v.name) return { name: v.name, description: v.description || v.name }
+        return { name: String(v), description: String(v) }
+      })
+    }
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) return parseVariables(parsed)
+      } catch { /* ignore */ }
+    }
+    return []
   }
 
   const handleExpand = (template: WhatsappTemplate) => {
