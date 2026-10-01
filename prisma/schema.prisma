@@ -154,6 +154,8 @@ model CustomerProfile {
   nicNumber               String?
   nicNumberEncrypted      String?
   phone                   String?
+  phoneVerified           Boolean   @default(false)
+  phoneVerifiedAt         DateTime?
   phone2                  String?
   dateOfBirth             DateTime?
   emergencyContact        String?
@@ -659,4 +661,28 @@ model WhatsAppTemplate {
   updatedBy   String?             // Admin who last edited
 
   @@map("whatsapp_templates")
+}
+
+model OtpChallenge {
+  id                    String    @id @default(cuid())
+  purpose               String    // REGISTRATION_WHATSAPP
+  phoneNumber           String    // Raw input
+  phoneNumberNormalized String    // 94XXXXXXXXX
+  otpHash               String    // bcrypt hash of 6-digit OTP
+  expiresAt             DateTime
+  verifiedAt            DateTime?
+  usedAt                DateTime?
+  attemptCount          Int       @default(0)
+  maxAttempts           Int       @default(5)
+  lastSentAt            DateTime
+  resendCount           Int       @default(0)
+  sessionToken          String    // Browser session binding
+  verificationToken     String?   // Issued after successful OTP verify
+  tokenExpiresAt        DateTime? // 15 min after verification
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([phoneNumberNormalized, purpose])
+  @@index([sessionToken])
+  @@map("otp_challenges")
 }

@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useRef, useCallback, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Building2, Users } from 'lucide-react'
+import { Building2, Users, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { signIn } from 'next-auth/react'
+
+type OtpState = 'idle' | 'sending' | 'sent' | 'verifying' | 'verified'
 
 function SignUpContent() {
   const router = useRouter()
@@ -23,10 +25,177 @@ function SignUpContent() {
   )
   const [isLoading, setIsLoading] = useState(false)
 
+  // WhatsApp OTP state (customer only)
+  const [whatsappNumber, setWhatsappNumber] = useState('')
+  const [otpState, setOtpState] = useState<OtpState>('idle')
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', ''])
+  const [challengeId, setChallengeId] = useState('')
+  const [sessionToken, setSessionToken] = useState('')
+  const [maskedPhone, setMaskedPhone] = useState('')
+  const [verificationToken, setVerificationToken] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [resendCountdown, setResendCountdown] = useState(0)
+  
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Resend countdown timer
+  useEffect(() => {
+    if (resendCountdown <= 0) return
+    const timer = setInterval(() => {
+      setResendCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [resendCountdown])
+
+  // ── Phone validation ────────────────────────────────────────────────
+  const isValidPhone = useCallback((phone: string) => {
+    const cleaned = phone.replace(/[^\d+]/g, '')
+    return /^(\+?94|0)\d{9}$/.test(cleaned)
+  }, [])
+
+  // ── Send OTP ────────────────────────────────────────────────────────
+  const handleSendOtp = async () => {
+    if (!isValidPhone(whatsappNumber)) {
+      setOtpError('Please enter a valid Sri Lankan phone number (e.g. 0771234567)')
+      return
+    }
+
+    setOtpState('sending')
+    setOtpError('')
+    setOtpDigits(['', '', '', '', '', ''])
+
+    try {
+      const res = await fetch('/api/auth/registration/send-whatsapp-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: whatsappNumber,
+          sessionToken: sessionToken || undefined,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setOtpError(data.error || 'Failed to send verification code.')
+        setOtpState('idle')
+        if (data.resendAvailableInSeconds) {
+          setResendCountdown(data.resendAvailableInSeconds)
+        }
+        return
+      }
+
+      setChallengeId(data.challengeId)
+      setSessionToken(data.sessionToken)
+      setMaskedPhone(data.maskedPhone)
+      setResendCountdown(data.resendAvailableInSeconds || 60)
+      setOtpState('sent')
+
+      // Focus first OTP input
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 100)
+    } catch {
+      setOtpError('Network error. Please try again.')
+      setOtpState('idle')
+    }
+  }
+
+  // ── OTP input handling ──────────────────────────────────────────────
+  const handleOtpChange = (index: number, value: string) => {
+    // Handle paste of full OTP
+    if (value.length > 1) {
+      const digits = value.replace(/\D/g, '').slice(0, 6).split('')
+      const newOtp = [...otpDigits]
+      digits.forEach((d, i) => {
+        if (index + i < 6) newOtp[index + i] = d
+      })
+      setOtpDigits(newOtp)
+      // Focus the input after the last pasted digit
+      const nextIndex = Math.min(index + digits.length, 5)
+      otpInputRefs.current[nextIndex]?.focus()
+      return
+    }
+
+    // Single digit
+    if (value && !/^\d$/.test(value)) return
+    
+    const newOtp = [...otpDigits]
+    newOtp[index] = value
+    setOtpDigits(newOtp)
+
+    // Auto-advance
+    if (value && index < 5) {
+      otpInputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus()
+    }
+  }
+
+  // ── Verify OTP ──────────────────────────────────────────────────────
+  const handleVerifyOtp = async () => {
+    const otp = otpDigits.join('')
+    if (otp.length !== 6) {
+      setOtpError('Please enter all 6 digits.')
+      return
+    }
+
+    setOtpState('verifying')
+    setOtpError('')
+
+    try {
+      const res = await fetch('/api/auth/registration/verify-whatsapp-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeId, otp, sessionToken }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setOtpError(data.error || 'Verification failed.')
+        setOtpState('sent')
+        return
+      }
+
+      setVerificationToken(data.registrationVerificationToken)
+      setMaskedPhone(data.maskedPhone)
+      setOtpState('verified')
+    } catch {
+      setOtpError('Network error. Please try again.')
+      setOtpState('sent')
+    }
+  }
+
+  // ── Change number ───────────────────────────────────────────────────
+  const handleChangeNumber = () => {
+    setOtpState('idle')
+    setOtpDigits(['', '', '', '', '', ''])
+    setChallengeId('')
+    setVerificationToken('')
+    setMaskedPhone('')
+    setOtpError('')
+    setResendCountdown(0)
+  }
+
+  // ── Submit registration ─────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (password !== confirmPassword) {
       setError('Passwords do not match')
+      return
+    }
+
+    if (role === 'customer' && otpState !== 'verified') {
+      setError('Please verify your WhatsApp number first.')
       return
     }
     
@@ -34,10 +203,17 @@ function SignUpContent() {
     setError('')
     
     try {
+      const payload: Record<string, string> = { name, email, password, role: role! }
+      
+      if (role === 'customer') {
+        payload.whatsappNumber = whatsappNumber
+        payload.registrationVerificationToken = verificationToken
+      }
+
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role })
+        body: JSON.stringify(payload)
       })
       
       const data = await res.json()
@@ -76,6 +252,8 @@ function SignUpContent() {
     // For existing users: they'll just sign in and go to dashboard
     signIn('google', { callbackUrl: '/auth/redirect' })
   }
+
+  const canSubmit = role === 'customer' ? otpState === 'verified' : true
 
   if (!role) {
     return (
@@ -151,8 +329,9 @@ function SignUpContent() {
             {error && <div className="text-red-500 text-sm text-center">{error}</div>}
             
             <div>
-              <label className="block text-sm font-medium text-gray-700">Full Name</label>
+              <label htmlFor="signup-name" className="block text-sm font-medium text-gray-700">Full Name</label>
               <input
+                id="signup-name"
                 type="text"
                 required
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -162,8 +341,9 @@ function SignUpContent() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email address</label>
+              <label htmlFor="signup-email" className="block text-sm font-medium text-gray-700">Email address</label>
               <input
+                id="signup-email"
                 type="email"
                 required
                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -173,8 +353,9 @@ function SignUpContent() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">Password</label>
+              <label htmlFor="signup-password" className="block text-sm font-medium text-gray-700">Password</label>
               <input
+                id="signup-password"
                 type="password"
                 required
                 minLength={6}
@@ -185,8 +366,9 @@ function SignUpContent() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
+              <label htmlFor="signup-confirm-password" className="block text-sm font-medium text-gray-700">Confirm Password</label>
               <input
+                id="signup-confirm-password"
                 type="password"
                 required
                 minLength={6}
@@ -196,13 +378,149 @@ function SignUpContent() {
               />
             </div>
 
+            {/* ── WhatsApp OTP Section (Customer only) ────────────────── */}
+            {role === 'customer' && (
+              <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                <label htmlFor="whatsapp-number" className="block text-sm font-medium text-gray-700">
+                  WhatsApp Number <span className="text-red-500">*</span>
+                </label>
+
+                {/* ── VERIFIED STATE ──────────────────────────────────── */}
+                {otpState === 'verified' ? (
+                  <div>
+                    <div className="flex items-center gap-2 py-2 px-3 bg-green-50 border border-green-200 rounded-md">
+                      <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      <span className="text-sm font-medium text-green-800">
+                        {maskedPhone} — Verified
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleChangeNumber}
+                        className="ml-auto text-xs text-blue-600 hover:underline"
+                      >
+                        Change Number
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* ── PHONE INPUT + VERIFY BUTTON ──────────────────── */}
+                    <div className="flex gap-2">
+                      <input
+                        id="whatsapp-number"
+                        type="tel"
+                        placeholder="0771234567"
+                        className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        value={whatsappNumber}
+                        onChange={e => {
+                          setWhatsappNumber(e.target.value)
+                          setOtpError('')
+                        }}
+                        disabled={otpState === 'sent' || otpState === 'sending' || otpState === 'verifying'}
+                        aria-describedby="whatsapp-help"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        disabled={!isValidPhone(whatsappNumber) || otpState === 'sending' || (otpState === 'sent' && resendCountdown > 0)}
+                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap flex items-center gap-1.5"
+                      >
+                        {otpState === 'sending' ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+                        ) : otpState === 'sent' ? (
+                          resendCountdown > 0 ? `Resend (${resendCountdown}s)` : 'Resend Code'
+                        ) : (
+                          'Verify Number'
+                        )}
+                      </button>
+                    </div>
+                    <p id="whatsapp-help" className="text-xs text-gray-500">
+                      Enter a WhatsApp number in Sri Lankan format, for example 0771234567.
+                      We will send a verification code to this number.
+                    </p>
+
+                    {/* ── OTP ENTRY ────────────────────────────────────── */}
+                    {(otpState === 'sent' || otpState === 'verifying') && (
+                      <div className="space-y-3 pt-2">
+                        <p className="text-sm text-gray-600" aria-live="polite">
+                          Verification code sent to <strong>{maskedPhone}</strong>
+                        </p>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                            Enter the 6-digit code
+                          </label>
+                          <div className="flex gap-2 justify-center" role="group" aria-label="OTP verification code">
+                            {otpDigits.map((digit, i) => (
+                              <input
+                                key={i}
+                                ref={el => { otpInputRefs.current[i] = el }}
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={6}
+                                value={digit}
+                                onChange={e => handleOtpChange(i, e.target.value)}
+                                onKeyDown={e => handleOtpKeyDown(i, e)}
+                                onPaste={e => {
+                                  e.preventDefault()
+                                  const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                                  if (pasted) handleOtpChange(0, pasted)
+                                }}
+                                className="w-10 h-12 text-center text-lg font-semibold border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                disabled={otpState === 'verifying'}
+                                aria-label={`Digit ${i + 1}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleVerifyOtp}
+                          disabled={otpDigits.join('').length !== 6 || otpState === 'verifying'}
+                          className="w-full py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          {otpState === 'verifying' ? (
+                            <><Loader2 className="w-4 h-4 animate-spin" /> Verifying code...</>
+                          ) : (
+                            'Verify OTP'
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* ── OTP Error ────────────────────────────────────── */}
+                    {otpError && (
+                      <div className="flex items-start gap-1.5 text-sm text-red-600" role="alert" aria-live="assertive">
+                        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span>{otpError}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ── Pre-verification help text ──────────────────────── */}
+                {otpState === 'idle' && (
+                  <p className="text-xs text-amber-600 font-medium">
+                    Verify your WhatsApp number to continue.
+                  </p>
+                )}
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !canSubmit}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 mt-6"
             >
               {isLoading ? 'Creating account...' : 'Create Account'}
             </button>
+            
+            {role === 'customer' && otpState !== 'verified' && (
+              <p className="text-xs text-center text-gray-400">
+                Please verify your WhatsApp number to enable account creation.
+              </p>
+            )}
           </form>
 
           <div className="text-sm text-center">

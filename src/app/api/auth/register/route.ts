@@ -1,13 +1,65 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { verifyVerificationToken, normalizeSriLankanPhone } from '@/lib/otp'
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password, role } = await req.json()
+    const body = await req.json()
+    const { name, email, password, role, whatsappNumber, registrationVerificationToken } = body
 
     if (!name || !email || !password || !role) {
       return NextResponse.json({ message: 'Missing fields' }, { status: 400 })
+    }
+
+    // ── Customer-specific: require WhatsApp OTP verification ──────────
+    let verifiedPhone: string | undefined
+
+    if (role === 'customer') {
+      if (!registrationVerificationToken || !whatsappNumber) {
+        return NextResponse.json(
+          { message: 'WhatsApp number verification is required before continuing.' },
+          { status: 400 }
+        )
+      }
+
+      // Verify server-signed token
+      const tokenPayload = verifyVerificationToken(registrationVerificationToken)
+      if (!tokenPayload) {
+        return NextResponse.json(
+          { message: 'Verification token is invalid or expired. Please verify your WhatsApp number again.' },
+          { status: 400 }
+        )
+      }
+
+      // Normalize submitted phone and verify it matches the token
+      const normalizedSubmitted = normalizeSriLankanPhone(whatsappNumber)
+      if (!normalizedSubmitted || normalizedSubmitted !== tokenPayload.phone) {
+        return NextResponse.json(
+          { message: 'WhatsApp number does not match the verified number. Please verify again.' },
+          { status: 400 }
+        )
+      }
+
+      // Verify the challenge exists and is verified + not yet used for registration
+      const challenge = await prisma.otpChallenge.findUnique({
+        where: { id: tokenPayload.challengeId },
+      })
+
+      if (!challenge || !challenge.verifiedAt || challenge.usedAt) {
+        return NextResponse.json(
+          { message: 'Verification has expired or was already used. Please verify your WhatsApp number again.' },
+          { status: 400 }
+        )
+      }
+
+      // Consume the challenge atomically
+      await prisma.otpChallenge.update({
+        where: { id: tokenPayload.challengeId },
+        data: { usedAt: new Date() },
+      })
+
+      verifiedPhone = tokenPayload.phone
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } })
@@ -22,7 +74,14 @@ export async function POST(req: Request) {
     })
 
     if (role === 'customer') {
-      await prisma.customerProfile.create({ data: { userId: user.id } })
+      await prisma.customerProfile.create({
+        data: {
+          userId: user.id,
+          phone: verifiedPhone,
+          phoneVerified: true,
+          phoneVerifiedAt: new Date(),
+        },
+      })
     }
 
     // For providers: create a Business stub (pending) + Free Trial subscription
