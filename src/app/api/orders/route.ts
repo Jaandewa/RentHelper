@@ -27,7 +27,19 @@ export async function GET(req: Request) {
 
     const where: any = { businessId: business.id }
     if (status && status !== 'all') where.status = status
-    if (q) where.bookingNumber = { contains: q }
+    if (q) {
+      const searchTerm = q.trim()
+      if (searchTerm) {
+        where.OR = [
+          { bookingNumber: { contains: searchTerm, mode: 'insensitive' } },
+          { customer: { user: { name: { contains: searchTerm, mode: 'insensitive' } } } },
+          { customer: { user: { email: { contains: searchTerm, mode: 'insensitive' } } } },
+          { customer: { nicNumber: { contains: searchTerm, mode: 'insensitive' } } },
+          { customer: { phone: { contains: searchTerm } } },
+          { bookingItems: { some: { item: { name: { contains: searchTerm, mode: 'insensitive' } } } } },
+        ]
+      }
+    }
 
     const bookings = await prisma.booking.findMany({
       where,

@@ -67,8 +67,16 @@ export default function BookingsPage() {
   }, [])
 
   const filtered = bookings.filter(b => {
-    const customerName = b.customer?.user?.name || 'Unknown'
-    const matchSearch = customerName.toLowerCase().includes(search.toLowerCase()) || b.bookingNumber?.toLowerCase().includes(search.toLowerCase()) || b.id.toLowerCase().includes(search.toLowerCase())
+    const s = search.trim().toLowerCase()
+    if (!s) return activeTab === 'all' || b.status === activeTab
+    const customerName = (b.customer?.user?.name || '').toLowerCase()
+    const customerEmail = (b.customer?.user?.email || '').toLowerCase()
+    const nicNumber = (b.customer?.nicNumber || '').toLowerCase()
+    const phone = (b.customer?.phone || '').toLowerCase()
+    const bookingNumber = (b.bookingNumber || '').toLowerCase()
+    const bookingId = (b.id || '').toLowerCase()
+    const itemNames = (b.bookingItems || []).map((bi: any) => (bi.item?.name || '').toLowerCase()).join(' ')
+    const matchSearch = customerName.includes(s) || bookingNumber.includes(s) || bookingId.includes(s) || nicNumber.includes(s) || phone.includes(s) || customerEmail.includes(s) || itemNames.includes(s)
     const matchTab = activeTab === 'all' || b.status === activeTab
     return matchSearch && matchTab
   })
@@ -131,7 +139,7 @@ export default function BookingsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by booking number or customer..."
+            placeholder="Search by booking number, customer name, ID number, or item..."
             className="pl-9 pr-4 py-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={search}
             onChange={e => setSearch(e.target.value)}
