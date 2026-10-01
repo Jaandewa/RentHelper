@@ -3,13 +3,14 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Star, Package, Calendar, CreditCard, Building2, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Star, Package, Calendar, CreditCard, Building2, CheckCircle2, Clock, AlertCircle, Shield } from 'lucide-react'
 
 const STATUS_STYLES: Record<string, string> = {
   pending_provider_approval: 'bg-purple-100 text-purple-800',
   awaiting_advance_payment: 'bg-amber-100 text-amber-800',
   confirmed: 'bg-blue-100 text-blue-800',
   active: 'bg-green-100 text-green-800',
+  returned_pending_settlement: 'bg-purple-100 text-purple-800',
   completed: 'bg-gray-100 text-gray-800',
   rejected_by_provider: 'bg-red-100 text-red-800',
   payment_expired: 'bg-gray-100 text-gray-600',
@@ -20,7 +21,8 @@ const STATUS_LABELS: Record<string, string> = {
   pending_provider_approval: 'Awaiting Provider',
   awaiting_advance_payment: 'Pay Advance',
   confirmed: 'Confirmed',
-  active: 'Active',
+  active: 'Active Rental',
+  returned_pending_settlement: 'Return Pending',
   completed: 'Completed',
   rejected_by_provider: 'Rejected',
   payment_expired: 'Payment Expired',
@@ -79,15 +81,40 @@ export default function CustomerBookingDetailPage({ params }: { params: Promise<
   const [reviewSuccess, setReviewSuccess] = useState(false)
   const [reviewError, setReviewError] = useState('')
 
-  useEffect(() => {
-    fetch(`/api/customer/booking-requests/${id}`)
-      .then(res => res.json())
-      .then(data => {
+  // Return states
+  const [returnProcessing, setReturnProcessing] = useState(false)
+  const [returnNotes, setReturnNotes] = useState('')
+  const [returnSuccess, setReturnSuccess] = useState('')
+  const [returnError, setReturnError] = useState('')
+  const [settlement, setSettlement] = useState<any>(null)
+
+  const fetchBooking = async () => {
+    try {
+      const res = await fetch(`/api/customer/booking-requests/${id}`)
+      if (res.ok) {
+        const data = await res.json()
         setBooking(data)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+      }
+    } catch {} finally { setLoading(false) }
+  }
+
+  const fetchSettlement = async () => {
+    try {
+      const res = await fetch(`/api/customer/bookings/${id}/inspections`)
+      if (res.ok) {
+        const data = await res.json()
+        setSettlement(data.depositSettlement || null)
+      }
+    } catch {}
+  }
+
+  useEffect(() => {
+    fetchBooking()
   }, [id])
+
+  useEffect(() => {
+    if (booking?.status === 'completed') fetchSettlement()
+  }, [booking?.status])
 
   const handleSubmitReview = async () => {
     if (rating === 0) {
@@ -145,6 +172,88 @@ export default function CustomerBookingDetailPage({ params }: { params: Promise<
           <p className="text-sm text-gray-500 mt-1">{new Date(booking.createdAt).toLocaleDateString()}</p>
         </div>
       </div>
+
+      {/* Active Rental Banner */}
+      {booking.status === 'active' && (
+        <div className="bg-green-50 p-6 rounded-xl border border-green-200 shadow-sm">
+          <div className="flex items-start gap-3">
+            <Package className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-green-900">Item Handed Over — Active Rental</h3>
+              <p className="text-sm text-green-800 mt-1">
+                Return due: {new Date(booking.returnDate).toLocaleDateString()}{booking.returnTime ? ` at ${booking.returnTime}` : ''}
+              </p>
+              <div className="mt-3 space-y-2">
+                <textarea
+                  rows={2}
+                  maxLength={500}
+                  placeholder="Return notes (optional)..."
+                  value={returnNotes}
+                  onChange={e => setReturnNotes(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                />
+                <button
+                  onClick={async () => {
+                    setReturnProcessing(true); setReturnError('')
+                    try {
+                      const res = await fetch(`/api/customer/bookings/${id}/mark-return`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ notes: returnNotes.trim() || undefined }),
+                      })
+                      if (res.ok) { setReturnSuccess('Item marked as returned. The provider will complete the inspection.'); fetchBooking() }
+                      else { const d = await res.json(); setReturnError(d.error || 'Failed to mark return') }
+                    } catch { setReturnError('Network error') }
+                    setReturnProcessing(false)
+                  }}
+                  disabled={returnProcessing}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {returnProcessing ? 'Processing...' : 'Mark Item Ready to Return'}
+                </button>
+                {returnError && <p className="text-sm text-red-600">{returnError}</p>}
+                {returnSuccess && <p className="text-sm text-green-700 font-medium">{returnSuccess}</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Pending Banner */}
+      {booking.status === 'returned_pending_settlement' && (
+        <div className="bg-purple-50 p-6 rounded-xl border border-purple-200 shadow-sm">
+          <div className="flex items-start gap-3">
+            <Clock className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-lg font-semibold text-purple-900">Return In Progress</h3>
+              <p className="text-sm text-purple-800 mt-1">Your item return is being processed. The provider will complete the inspection and deposit settlement.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deposit Settlement Card */}
+      {booking.status === 'completed' && settlement && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-gray-400" /> Deposit Settlement
+          </h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between"><span className="text-gray-600">Security deposit paid</span><span className="font-medium">Rs. {settlement.originalDepositAmount?.toLocaleString()}</span></div>
+            {settlement.deductionAmount > 0 && (
+              <>
+                <div className="flex justify-between"><span className="text-gray-600">Deduction</span><span className="text-red-600 font-medium">- Rs. {settlement.deductionAmount?.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-600">Reason</span><span className="text-gray-800">{settlement.deductionReasonText || 'N/A'}</span></div>
+              </>
+            )}
+            <div className="h-px bg-gray-100" />
+            <div className="flex justify-between font-semibold"><span>Refund amount</span><span className="text-green-700">Rs. {settlement.refundAmount?.toLocaleString()}</span></div>
+            <div className="flex justify-between text-gray-600"><span>Status</span><span className="capitalize">{(settlement.settlementStatus || '').replace(/_/g, ' ').toLowerCase()}</span></div>
+            {settlement.settlementMethod && <div className="flex justify-between text-gray-600"><span>Method</span><span className="capitalize">{settlement.settlementMethod.replace(/_/g, ' ').toLowerCase()}</span></div>}
+            {settlement.refundReference && <div className="flex justify-between text-gray-600"><span>Reference</span><span>{settlement.refundReference}</span></div>}
+          </div>
+        </div>
+      )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

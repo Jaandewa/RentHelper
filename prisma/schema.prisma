@@ -334,6 +334,8 @@ model Booking {
   customerReviewed Boolean        @default(false)
   providerReviewed Boolean        @default(false)
   ad              RentalAd?        @relation(fields: [adId], references: [id])
+  inspections      RentalInspection[]
+  depositSettlement DepositSettlement?
 
   @@index([businessId])
   @@index([customerId])
@@ -686,4 +688,60 @@ model OtpChallenge {
   @@index([phoneNumberNormalized, purpose])
   @@index([sessionToken])
   @@map("otp_challenges")
+}
+
+model RentalInspection {
+  id                      String    @id @default(cuid())
+  bookingId               String
+  type                    String    // HANDOVER, RETURN
+  performedByUserId       String
+  performedAt             DateTime  @default(now())
+  conditionStatus         String    // EXCELLENT, GOOD, FAIR, DAMAGED, MISSING_ITEMS, OTHER
+  notes                   String?
+  customerAcknowledgedAt  DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  booking   Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  media     InspectionMedia[]
+
+  @@index([bookingId])
+  @@map("rental_inspections")
+}
+
+model InspectionMedia {
+  id           String   @id @default(cuid())
+  inspectionId String
+  url          String
+  caption      String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  inspection RentalInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId])
+  @@map("inspection_media")
+}
+
+model DepositSettlement {
+  id                    String    @id @default(cuid())
+  bookingId             String    @unique
+  originalDepositAmount Float
+  deductionAmount       Float     @default(0)
+  refundAmount          Float     @default(0)
+  settlementStatus      String    // FULL_REFUND, PARTIAL_REFUND, WITHHELD, PENDING_MANUAL, NOT_APPLICABLE
+  settlementMethod      String?   // MANUAL_BANK_TRANSFER, CASH, NONE
+  deductionReasonCode   String?   // NO_DEDUCTION, ITEM_DAMAGE, MISSING_ITEM, LATE_RETURN, EXCESS_CLEANING, UNPAID_BALANCE, OTHER
+  deductionReasonText   String?
+  providerNotes         String?   
+  refundReference       String?
+  refundProcessedAt     DateTime?
+  processedByUserId     String
+  customerNotifiedAt    DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("deposit_settlements")
 }

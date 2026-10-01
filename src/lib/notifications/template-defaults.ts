@@ -16,6 +16,8 @@ export const WHATSAPP_EVENT_TYPES = [
   'BOOKING_CONFIRMED_PROVIDER',
   'ITEM_HANDED_OVER',
   'REVIEW_SUBMITTED',
+  'DEPOSIT_REFUNDED',
+  'DEPOSIT_DEDUCTION_APPLIED',
 ] as const
 
 export type WhatsAppEventType = typeof WHATSAPP_EVENT_TYPES[number]
@@ -32,6 +34,8 @@ export const EVENT_VARIABLES: Record<WhatsAppEventType, string[]> = {
   BOOKING_CONFIRMED_PROVIDER: ['providerName', 'bookingId', 'customerName', 'customerDisplayId', 'itemName', 'pickupDateTime', 'returnDateTime', 'amountPaid', 'advancePaid', 'remainingBalance', 'providerBookingUrl', 'supportContact'],
   ITEM_HANDED_OVER: ['customerName', 'bookingId', 'itemName', 'providerName', 'pickupDateTime', 'returnDateTime', 'rentalDuration', 'returnInstructions', 'supportContact'],
   REVIEW_SUBMITTED: ['recipientName', 'reviewerName', 'bookingId', 'itemName', 'rating', 'reviewText', 'profileUrl', 'supportContact'],
+  DEPOSIT_REFUNDED: ['customerName', 'bookingId', 'itemName', 'providerName', 'securityDeposit', 'refundAmount', 'refundMethod', 'refundReference', 'supportContact'],
+  DEPOSIT_DEDUCTION_APPLIED: ['customerName', 'bookingId', 'itemName', 'providerName', 'securityDeposit', 'deductionAmount', 'deductionReason', 'refundAmount', 'settlementStatus', 'supportContact'],
 }
 
 /** Preview mock values for admin preview */
@@ -245,5 +249,43 @@ Review: {reviewText}
 
 View your profile:
 {profileUrl}`,
+  },
+
+  {
+    eventType: 'DEPOSIT_REFUNDED',
+    name: 'Deposit Refunded',
+    description: 'Sent to customer when their security deposit is fully refunded after return',
+    messageBody: `Hello {customerName},
+
+Your rental return inspection has been completed. ✅
+
+Booking ID: {bookingId}
+Item: {itemName}
+
+Security deposit: Rs. {securityDeposit}
+Refund amount: Rs. {refundAmount}
+Refund method: {refundMethod}
+Reference: {refundReference}
+
+Thank you for renting with {providerName}.`,
+  },
+  {
+    eventType: 'DEPOSIT_DEDUCTION_APPLIED',
+    name: 'Deposit Deduction Applied',
+    description: 'Sent to customer when deductions are applied to their security deposit',
+    messageBody: `Hello {customerName},
+
+Your rental return inspection has been completed.
+
+Booking ID: {bookingId}
+Item: {itemName}
+
+Security deposit: Rs. {securityDeposit}
+Deduction: Rs. {deductionAmount}
+Reason: {deductionReason}
+Refund amount: Rs. {refundAmount}
+Settlement status: {settlementStatus}
+
+Need help? {supportContact}`,
   },
 ]

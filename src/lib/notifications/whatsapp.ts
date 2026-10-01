@@ -434,3 +434,63 @@ export async function sendItemHandedOverWhatsApp(customerPhone: string, details:
   if (result.skipped) return { success: true, skipped: true }
   return sendWhatsAppText(customerPhone, result.message, { eventType: 'ITEM_HANDED_OVER' })
 }
+
+export async function sendDepositRefundedWhatsApp(
+  customerPhone: string,
+  details: {
+    customerName: string
+    bookingId: string
+    itemName: string
+    providerName: string
+    securityDeposit: string
+    refundAmount: string
+    refundMethod: string
+    refundReference: string
+  }
+) {
+  const result = await renderWhatsAppTemplate('DEPOSIT_REFUNDED', {
+    customerName: details.customerName,
+    bookingId: details.bookingId,
+    itemName: details.itemName,
+    providerName: details.providerName,
+    securityDeposit: details.securityDeposit,
+    refundAmount: details.refundAmount,
+    refundMethod: details.refundMethod,
+    refundReference: details.refundReference,
+    supportContact: SUPPORT_CONTACT,
+  })
+
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(customerPhone, result.message, { eventType: 'DEPOSIT_REFUNDED' })
+}
+
+export async function sendDepositDeductionWhatsApp(
+  customerPhone: string,
+  details: {
+    customerName: string
+    bookingId: string
+    itemName: string
+    providerName: string
+    securityDeposit: string
+    deductionAmount: string
+    deductionReason: string
+    refundAmount: string
+    settlementStatus: string
+  }
+) {
+  const result = await renderWhatsAppTemplate('DEPOSIT_DEDUCTION_APPLIED', {
+    customerName: details.customerName,
+    bookingId: details.bookingId,
+    itemName: details.itemName,
+    providerName: details.providerName,
+    securityDeposit: details.securityDeposit,
+    deductionAmount: details.deductionAmount,
+    deductionReason: details.deductionReason,
+    refundAmount: details.refundAmount,
+    settlementStatus: details.settlementStatus,
+    supportContact: SUPPORT_CONTACT,
+  })
+
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(customerPhone, result.message, { eventType: 'DEPOSIT_DEDUCTION_APPLIED' })
+}

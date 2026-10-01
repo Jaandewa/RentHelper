@@ -2,8 +2,9 @@
 
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Check, X, CreditCard, Calendar, Truck, User, FileText, CheckCircle2, Package, Clock, AlertCircle, Shield, MapPin, Star } from 'lucide-react'
+import { ArrowLeft, Check, X, CreditCard, Calendar, Truck, User, FileText, CheckCircle2, Package, Clock, AlertCircle, Shield, MapPin, Star, Camera, ClipboardCheck, Upload } from 'lucide-react'
 import Link from 'next/link'
+import { HANDOVER_CONDITIONS, RETURN_CONDITIONS, DEPOSIT_DEDUCTION_REASONS, SETTLEMENT_METHODS } from '@/lib/deposit-deduction-reasons'
 
 const STATUS_STYLES: Record<string, string> = {
   active: 'bg-green-100 text-green-800',
@@ -55,6 +56,26 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   // Feedback states
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+
+  // Handover states
+  const [showHandoverModal, setShowHandoverModal] = useState(false)
+  const [handoverCondition, setHandoverCondition] = useState('')
+  const [handoverNotes, setHandoverNotes] = useState('')
+  const [handoverProcessing, setHandoverProcessing] = useState(false)
+  const [handoverError, setHandoverError] = useState('')
+
+  // Return inspection states
+  const [showInspectionModal, setShowInspectionModal] = useState(false)
+  const [returnCondition, setReturnCondition] = useState('')
+  const [returnNotes, setReturnNotes] = useState('')
+  const [actualReturnDate, setActualReturnDate] = useState(new Date().toISOString().slice(0, 16))
+  const [deductionAmount, setDeductionAmount] = useState('0')
+  const [deductionReasonCode, setDeductionReasonCode] = useState('NO_DEDUCTION')
+  const [deductionReasonText, setDeductionReasonText] = useState('')
+  const [settlementMethod, setSettlementMethod] = useState('')
+  const [refundReference, setRefundReference] = useState('')
+  const [inspectionProcessing, setInspectionProcessing] = useState(false)
+  const [inspectionError, setInspectionError] = useState('')
 
   const fetchBooking = async () => {
     try {
@@ -259,11 +280,59 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
         <div className="bg-blue-50 p-6 rounded-xl border border-blue-200 shadow-sm">
           <div className="flex items-start gap-3">
             <CheckCircle2 className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div>
+            <div className="flex-1">
               <h3 className="text-lg font-semibold text-blue-900">Booking Confirmed</h3>
               <p className="text-sm text-blue-800 mt-1">
                 Customer has paid the advance. This booking is confirmed and the item is reserved.
               </p>
+              <button
+                onClick={() => setShowHandoverModal(true)}
+                className="mt-3 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <ClipboardCheck className="w-4 h-4" /> Mark Item Handed Over
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Rental Bar */}
+      {booking.status === 'active' && (
+        <div className="bg-green-50 p-6 rounded-xl border border-green-200 shadow-sm">
+          <div className="flex items-start gap-3">
+            <Package className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-green-900">Item Handed Over — Active Rental</h3>
+              <p className="text-sm text-green-800 mt-1">
+                Return due: {new Date(booking.returnDate).toLocaleDateString()}{booking.returnTime ? ` at ${booking.returnTime}` : ''}
+              </p>
+              <button
+                onClick={() => setShowInspectionModal(true)}
+                className="mt-3 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
+              >
+                <ClipboardCheck className="w-4 h-4" /> Start Return Inspection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Returned Pending Settlement Bar */}
+      {booking.status === 'returned_pending_settlement' && (
+        <div className="bg-purple-50 p-6 rounded-xl border border-purple-200 shadow-sm">
+          <div className="flex items-start gap-3">
+            <Clock className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-purple-900">Item Returned — Pending Inspection</h3>
+              <p className="text-sm text-purple-800 mt-1">
+                Customer has marked the item as returned. Complete the return inspection and deposit settlement.
+              </p>
+              <button
+                onClick={() => setShowInspectionModal(true)}
+                className="mt-3 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors flex items-center gap-2"
+              >
+                <ClipboardCheck className="w-4 h-4" /> Complete Return Inspection
+              </button>
             </div>
           </div>
         </div>
@@ -600,6 +669,266 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 ) : (
                   <><X className="w-4 h-4" /> Confirm Rejection</>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* HANDOVER MODAL */}
+      {showHandoverModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <ClipboardCheck className="w-6 h-6 text-green-600" /> Confirm Item Handover
+            </h3>
+
+            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+              <p><span className="font-medium">Booking:</span> {booking.bookingNumber}</p>
+              <p><span className="font-medium">Customer:</span> {booking.customer?.user?.name}</p>
+              <p><span className="font-medium">Item:</span> {booking.bookingItems?.[0]?.item?.name || 'N/A'}</p>
+              {booking.depositAmount > 0 && (
+                <p><span className="font-medium">Security deposit:</span> Rs. {booking.depositAmount.toLocaleString()}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Item condition at handover <span className="text-red-500">*</span></label>
+              <select
+                value={handoverCondition}
+                onChange={e => { setHandoverCondition(e.target.value); setHandoverError('') }}
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-green-500 bg-white"
+              >
+                <option value="">Select condition</option>
+                {HANDOVER_CONDITIONS.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Condition notes (optional)</label>
+              <textarea
+                rows={3}
+                maxLength={1000}
+                placeholder="Any existing marks, damage, or notes about the item condition..."
+                value={handoverNotes}
+                onChange={e => setHandoverNotes(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-xs text-gray-400 mt-0.5 text-right">{handoverNotes.length}/1000</p>
+            </div>
+
+            {handoverError && <p className="text-sm text-red-600 font-medium">{handoverError}</p>}
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => { setShowHandoverModal(false); setHandoverError(''); setHandoverCondition(''); setHandoverNotes('') }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!handoverCondition) { setHandoverError('Please select a condition.'); return }
+                  setHandoverProcessing(true); setHandoverError('')
+                  try {
+                    const res = await fetch(`/api/provider/bookings/${id}/handover`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ conditionStatus: handoverCondition, notes: handoverNotes.trim() || undefined }),
+                    })
+                    if (res.ok) { setShowHandoverModal(false); fetchBooking(); setSuccessMsg('Item handed over successfully. Customer has been notified.') }
+                    else { const d = await res.json(); setHandoverError(d.error || 'Failed to hand over item') }
+                  } catch { setHandoverError('Network error') }
+                  setHandoverProcessing(false)
+                }}
+                disabled={handoverProcessing || !handoverCondition}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {handoverProcessing ? 'Processing...' : 'Confirm Handover'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RETURN INSPECTION MODAL */}
+      {showInspectionModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <ClipboardCheck className="w-6 h-6 text-purple-600" /> Return Inspection
+            </h3>
+
+            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+              <p><span className="font-medium">Booking:</span> {booking.bookingNumber}</p>
+              <p><span className="font-medium">Customer:</span> {booking.customer?.user?.name}</p>
+              <p><span className="font-medium">Scheduled return:</span> {new Date(booking.returnDate).toLocaleDateString()}</p>
+              {booking.depositAmount > 0 && (
+                <p><span className="font-medium">Security deposit:</span> Rs. {booking.depositAmount.toLocaleString()}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Actual return date/time <span className="text-red-500">*</span></label>
+              <input
+                type="datetime-local"
+                value={actualReturnDate}
+                onChange={e => setActualReturnDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Return condition <span className="text-red-500">*</span></label>
+              <select
+                value={returnCondition}
+                onChange={e => { setReturnCondition(e.target.value); setInspectionError('') }}
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 bg-white"
+              >
+                <option value="">Select condition</option>
+                {RETURN_CONDITIONS.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Inspection notes <span className="text-red-500">*</span></label>
+              <textarea
+                rows={3}
+                maxLength={1000}
+                placeholder="Describe the condition of the returned item..."
+                value={returnNotes}
+                onChange={e => setReturnNotes(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            {booking.depositAmount > 0 && (
+              <>
+                <hr className="border-gray-200" />
+                <h4 className="text-sm font-semibold text-gray-800">Security Deposit Settlement</h4>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Deduction type</label>
+                  <select
+                    value={deductionReasonCode}
+                    onChange={e => { setDeductionReasonCode(e.target.value); if (e.target.value === 'NO_DEDUCTION') setDeductionAmount('0') }}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white"
+                  >
+                    {DEPOSIT_DEDUCTION_REASONS.map(r => (
+                      <option key={r.code} value={r.code}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {deductionReasonCode !== 'NO_DEDUCTION' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Deduction amount (Rs.)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={booking.depositAmount}
+                        step="0.01"
+                        value={deductionAmount}
+                        onChange={e => setDeductionAmount(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Deduction reason / explanation <span className="text-red-500">*</span></label>
+                      <textarea
+                        rows={2}
+                        maxLength={500}
+                        placeholder="Explain the deduction..."
+                        value={deductionReasonText}
+                        onChange={e => setDeductionReasonText(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="bg-blue-50 rounded-lg p-3 text-sm space-y-1">
+                  <div className="flex justify-between"><span>Security deposit:</span><span>Rs. {booking.depositAmount.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span>Deduction:</span><span className="text-red-600">Rs. {parseFloat(deductionAmount || '0').toLocaleString()}</span></div>
+                  <div className="flex justify-between font-semibold border-t border-blue-200 pt-1 mt-1"><span>Refund:</span><span className="text-green-700">Rs. {Math.max(0, booking.depositAmount - parseFloat(deductionAmount || '0')).toLocaleString()}</span></div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Settlement method <span className="text-red-500">*</span></label>
+                  <select
+                    value={settlementMethod}
+                    onChange={e => setSettlementMethod(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white"
+                  >
+                    <option value="">Select method</option>
+                    {SETTLEMENT_METHODS.map(m => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {settlementMethod && settlementMethod !== 'NONE' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Settlement reference</label>
+                    <input
+                      type="text"
+                      placeholder="Bank transfer ref, receipt number..."
+                      value={refundReference}
+                      onChange={e => setRefundReference(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {inspectionError && <p className="text-sm text-red-600 font-medium">{inspectionError}</p>}
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => { setShowInspectionModal(false); setInspectionError('') }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!returnCondition) { setInspectionError('Please select return condition.'); return }
+                  if (!returnNotes.trim()) { setInspectionError('Please add inspection notes.'); return }
+                  if (booking.depositAmount > 0 && !settlementMethod) { setInspectionError('Please select settlement method.'); return }
+                  const ded = parseFloat(deductionAmount || '0')
+                  if (ded < 0 || ded > booking.depositAmount) { setInspectionError('Invalid deduction amount.'); return }
+                  if (ded > 0 && deductionReasonCode === 'NO_DEDUCTION') { setInspectionError('Select a deduction reason.'); return }
+                  if (ded > 0 && !deductionReasonText.trim()) { setInspectionError('Deduction explanation required.'); return }
+                  setInspectionProcessing(true); setInspectionError('')
+                  try {
+                    const res = await fetch(`/api/provider/bookings/${id}/return-inspection`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        conditionStatus: returnCondition,
+                        notes: returnNotes.trim(),
+                        actualReturnDate: new Date(actualReturnDate).toISOString(),
+                        deductionAmount: ded,
+                        deductionReasonCode: ded > 0 ? deductionReasonCode : 'NO_DEDUCTION',
+                        deductionReasonText: ded > 0 ? deductionReasonText.trim() : undefined,
+                        settlementMethod: booking.depositAmount > 0 ? settlementMethod : 'NONE',
+                        refundReference: refundReference.trim() || undefined,
+                      }),
+                    })
+                    if (res.ok) { setShowInspectionModal(false); fetchBooking(); setSuccessMsg('Return inspection completed. Customer has been notified.') }
+                    else { const d = await res.json(); setInspectionError(d.error || 'Failed to complete inspection') }
+                  } catch { setInspectionError('Network error') }
+                  setInspectionProcessing(false)
+                }}
+                disabled={inspectionProcessing || !returnCondition}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {inspectionProcessing ? 'Processing...' : 'Complete Return Inspection'}
               </button>
             </div>
           </div>
