@@ -83,9 +83,18 @@ export interface KycRejectedParams {
   reason: string
 }
 
+/** Optional event context for delivery log enrichment */
+export interface WhatsAppEventContext {
+  eventType?: string
+  recipientUserId?: string
+  relatedEntityId?: string
+  metadata?: any
+}
+
 export async function sendWhatsAppText(
   param1: string | WhatsAppSendParams,
-  param2?: string
+  param2?: string,
+  eventContext?: WhatsAppEventContext
 ) {
   let targetPhone = ''
   let targetMessage = ''
@@ -112,10 +121,14 @@ export async function sendWhatsAppText(
       await prisma.notificationDelivery.create({
         data: {
           type: 'whatsapp_text',
+          eventType: eventContext?.eventType || undefined,
           recipient: targetPhone,
+          recipientUserId: eventContext?.recipientUserId || undefined,
+          relatedEntityId: eventContext?.relatedEntityId || undefined,
           channel: 'whatsapp',
           status: 'not_configured',
           error: 'WhatsApp integration is disabled',
+          metadata: eventContext?.metadata || undefined,
           sentAt: new Date(),
         },
       }).catch(() => {})
@@ -126,10 +139,14 @@ export async function sendWhatsAppText(
       await prisma.notificationDelivery.create({
         data: {
           type: 'whatsapp_text',
+          eventType: eventContext?.eventType || undefined,
           recipient: targetPhone,
+          recipientUserId: eventContext?.recipientUserId || undefined,
+          relatedEntityId: eventContext?.relatedEntityId || undefined,
           channel: 'whatsapp',
           status: 'not_configured',
           error: 'Missing HostGrap email or API key',
+          metadata: eventContext?.metadata || undefined,
           sentAt: new Date(),
         },
       }).catch(() => {})
@@ -170,10 +187,14 @@ export async function sendWhatsAppText(
     await prisma.notificationDelivery.create({
       data: {
         type: 'whatsapp_text',
+        eventType: eventContext?.eventType || undefined,
         recipient: targetPhone,
+        recipientUserId: eventContext?.recipientUserId || undefined,
+        relatedEntityId: eventContext?.relatedEntityId || undefined,
         channel: 'whatsapp',
         status: isSuccess ? 'sent' : 'failed',
         error: isSuccess ? null : (responseData?.message || responseData?.error || sanitizedResponse || `HTTP ${res.status}`),
+        metadata: eventContext?.metadata || undefined,
         sentAt: new Date(),
       },
     }).catch(() => {})
@@ -190,10 +211,14 @@ export async function sendWhatsAppText(
     await prisma.notificationDelivery.create({
       data: {
         type: 'whatsapp_text',
+        eventType: eventContext?.eventType || undefined,
         recipient: targetPhone,
+        recipientUserId: eventContext?.recipientUserId || undefined,
+        relatedEntityId: eventContext?.relatedEntityId || undefined,
         channel: 'whatsapp',
         status: 'failed',
         error: errorMsg.slice(0, 500),
+        metadata: eventContext?.metadata || undefined,
         sentAt: new Date(),
       },
     }).catch(() => {})
@@ -232,7 +257,7 @@ export async function sendKycApprovedWhatsApp(
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(phone, result.message)
+  return sendWhatsAppText(phone, result.message, { eventType: 'KYC_APPROVED' })
 }
 
 export async function sendKycRejectedWhatsApp(
@@ -262,7 +287,7 @@ export async function sendKycRejectedWhatsApp(
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(phone, result.message)
+  return sendWhatsAppText(phone, result.message, { eventType: 'KYC_REJECTED' })
 }
 
 export async function sendTestWhatsAppMessage(
@@ -292,7 +317,7 @@ export async function sendBookingRequestWhatsApp(providerPhone: string, details:
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(providerPhone, result.message)
+  return sendWhatsAppText(providerPhone, result.message, { eventType: 'NEW_BOOKING_REQUEST' })
 }
 
 export async function sendBookingAcceptedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, advanceRequired: number, paymentDeadline?: string, bookingId?: string }) {
@@ -310,7 +335,7 @@ export async function sendBookingAcceptedWhatsApp(customerPhone: string, details
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(customerPhone, result.message)
+  return sendWhatsAppText(customerPhone, result.message, { eventType: 'BOOKING_ACCEPTED' })
 }
 
 export async function sendBookingRejectedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, reason: string, bookingId?: string }) {
@@ -325,7 +350,7 @@ export async function sendBookingRejectedWhatsApp(customerPhone: string, details
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(customerPhone, result.message)
+  return sendWhatsAppText(customerPhone, result.message, { eventType: 'BOOKING_REJECTED' })
 }
 
 export async function sendBookingConfirmedWhatsApp(customerPhone: string, details: { itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, advancePaid: number, balanceDue: number, deposit: number, bookingId?: string }) {
@@ -345,7 +370,7 @@ export async function sendBookingConfirmedWhatsApp(customerPhone: string, detail
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(customerPhone, result.message)
+  return sendWhatsAppText(customerPhone, result.message, { eventType: 'PAYMENT_CONFIRMED' })
 }
 
 export async function sendBookingConfirmedProviderWhatsApp(providerPhone: string, details: { customerName: string, itemName: string, pickupDateTime: string, returnDateTime: string, advancePaid: number, bookingId?: string }) {
@@ -363,7 +388,7 @@ export async function sendBookingConfirmedProviderWhatsApp(providerPhone: string
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(providerPhone, result.message)
+  return sendWhatsAppText(providerPhone, result.message, { eventType: 'BOOKING_CONFIRMED_PROVIDER' })
 }
 
 export async function sendReviewSubmittedWhatsApp(recipientPhone: string, details: { reviewerName: string, rating: number, itemName: string, bookingNumber: string, recipientName?: string }) {
@@ -379,7 +404,7 @@ export async function sendReviewSubmittedWhatsApp(recipientPhone: string, detail
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(recipientPhone, result.message)
+  return sendWhatsAppText(recipientPhone, result.message, { eventType: 'REVIEW_SUBMITTED' })
 }
 
 export async function sendRegistrationOtpWhatsApp(phone: string, details: { customerName: string, otpCode: string, expiryMinutes?: number }) {
@@ -392,7 +417,7 @@ export async function sendRegistrationOtpWhatsApp(phone: string, details: { cust
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(phone, result.message)
+  return sendWhatsAppText(phone, result.message, { eventType: 'REGISTRATION_OTP' })
 }
 
 export async function sendItemHandedOverWhatsApp(customerPhone: string, details: { customerName: string, itemName: string, providerName: string, pickupDateTime: string, returnDateTime: string, bookingId?: string }) {
@@ -407,5 +432,5 @@ export async function sendItemHandedOverWhatsApp(customerPhone: string, details:
   })
 
   if (result.skipped) return { success: true, skipped: true }
-  return sendWhatsAppText(customerPhone, result.message)
+  return sendWhatsAppText(customerPhone, result.message, { eventType: 'ITEM_HANDED_OVER' })
 }

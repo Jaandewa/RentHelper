@@ -49,13 +49,14 @@ interface DispatchParams {
 }
 
 /**
- * Core dispatcher — creates in-app notification + WhatsApp delivery log.
+ * Core dispatcher — creates in-app notification.
+ * WhatsApp delivery logs are created by sendWhatsAppText() with final status.
  * Never throws.
  */
 async function dispatchNotification(params: DispatchParams): Promise<void> {
-  const { userId, eventType, subject, body, recipientPhone, relatedEntityId, metadata } = params
+  const { userId, eventType, subject, body } = params
 
-  // 1. Create in-app notification (always)
+  // Create in-app notification (always)
   try {
     await prisma.notification.create({
       data: {
@@ -70,27 +71,6 @@ async function dispatchNotification(params: DispatchParams): Promise<void> {
     })
   } catch (e) {
     console.error(`[Notification Service] Failed to create in-app notification for ${eventType}:`, e)
-  }
-
-  // 2. Create WhatsApp delivery log
-  if (recipientPhone) {
-    try {
-      await prisma.notificationDelivery.create({
-        data: {
-          type: 'whatsapp_text',
-          eventType,
-          recipient: recipientPhone,
-          recipientUserId: userId,
-          channel: 'whatsapp',
-          status: 'pending',
-          relatedEntityId: relatedEntityId || null,
-          metadata: metadata || undefined,
-          sentAt: new Date(),
-        },
-      })
-    } catch (e) {
-      console.error(`[Notification Service] Failed to create delivery log for ${eventType}:`, e)
-    }
   }
 }
 
