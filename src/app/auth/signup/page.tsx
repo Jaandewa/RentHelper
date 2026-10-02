@@ -34,11 +34,6 @@ function SignUpContent() {
   // Customer-specific state
   const [customerType, setCustomerType] = useState<CustomerType>('LOCAL')
   const [selectedCountryCode, setSelectedCountryCode] = useState('LK')
-  const [nicNumber, setNicNumber] = useState('')
-  const [passportNumber, setPassportNumber] = useState('')
-  const [nationalityCode, setNationalityCode] = useState('')
-  const [passportIssuingCode, setPassportIssuingCode] = useState('')
-  const [address, setAddress] = useState('')
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [countrySearch, setCountrySearch] = useState('')
 
@@ -97,14 +92,17 @@ function SignUpContent() {
   const isValidPhone = useCallback((phone: string) => {
     if (!phone.trim()) return false
     const cleaned = phone.replace(/[^\d+]/g, '')
-    if (selectedCountryCode === 'LK') {
+    if (role === 'customer' && customerType === 'LOCAL') {
       return /^(\+?94|0)\d{9}$/.test(cleaned)
     }
-    // International: at least 4 digits
-    return /^\d{4,15}$/.test(cleaned)
-  }, [selectedCountryCode])
+    if (role === 'customer' && customerType === 'FOREIGN') {
+      return /^\d{4,15}$/.test(cleaned)
+    }
+    // Provider: Sri Lankan only
+    return /^(\+?94|0)\d{9}$/.test(cleaned)
+  }, [role, customerType])
 
-  // ── Clear OTP state when country or number changes ──────────────────
+  // ── Clear OTP state ──────────────────────────────────────────────
   const clearOtpState = useCallback(() => {
     if (otpState !== 'idle') {
       setOtpState('idle')
@@ -117,33 +115,37 @@ function SignUpContent() {
     }
   }, [otpState])
 
+  const handleCustomerTypeChange = (type: CustomerType) => {
+    setCustomerType(type)
+    if (type === 'LOCAL') {
+      setSelectedCountryCode('LK')
+    } else {
+      setSelectedCountryCode('')
+    }
+    setWhatsappNumber('')
+    clearOtpState()
+  }
+
   const handleCountryChange = (code: string) => {
     setSelectedCountryCode(code)
     setShowCountryDropdown(false)
     setCountrySearch('')
+    setWhatsappNumber('')
     clearOtpState()
   }
 
   const handleWhatsappChange = (value: string) => {
     setWhatsappNumber(value)
     setOtpError('')
-    clearOtpState()
-  }
-
-  // ── Customer type switch ────────────────────────────────────────────
-  const handleCustomerTypeChange = (type: CustomerType) => {
-    setCustomerType(type)
-    if (type === 'LOCAL') {
-      setSelectedCountryCode('LK')
-      clearOtpState()
-    }
+    if (otpState !== 'idle') clearOtpState()
   }
 
   // ── Send OTP ────────────────────────────────────────────────────────
   const handleSendOtp = async () => {
     if (!isValidPhone(whatsappNumber)) {
-      setOtpError(selectedCountryCode === 'LK' 
-        ? 'Please enter a valid Sri Lankan phone number (e.g. 0771234567)' 
+      const isLocal = role === 'provider' || (role === 'customer' && customerType === 'LOCAL')
+      setOtpError(isLocal
+        ? 'Please enter a valid Sri Lankan phone number (e.g. 0771234567)'
         : 'Please enter a valid phone number')
       return
     }
@@ -161,8 +163,8 @@ function SignUpContent() {
         phoneNumber: whatsappNumber,
         sessionToken: sessionToken || undefined,
       }
-      // Send country code for customer international numbers
-      if (role === 'customer') {
+      // Send country code for customer foreign numbers
+      if (role === 'customer' && customerType === 'FOREIGN' && selectedCountryCode) {
         body.countryCode = selectedCountryCode
       }
 
@@ -308,23 +310,8 @@ function SignUpContent() {
       // Customer-specific fields
       if (role === 'customer') {
         payload.customerType = customerType
-        payload.whatsappCountryCode = selectedCountry?.dialCode || '94'
-        
-        if (customerType === 'LOCAL') {
-          if (nicNumber.trim()) {
-            payload.identityType = 'NIC'
-            payload.identityNumber = nicNumber.trim()
-          }
-          payload.address = address.trim() || null
-        } else {
-          if (passportNumber.trim()) {
-            payload.identityType = 'PASSPORT'
-            payload.identityNumber = passportNumber.trim()
-          }
-          payload.nationality = nationalityCode || null
-          payload.passportIssuingCountry = passportIssuingCode || null
-          payload.address = address.trim() || null
-        }
+        const dialCode = customerType === 'LOCAL' ? '94' : (selectedCountry?.dialCode || '94')
+        payload.whatsappCountryCode = dialCode
       }
 
       const res = await fetch('/api/auth/register', {
@@ -363,14 +350,14 @@ function SignUpContent() {
   }
 
   const handleGoogleSignup = () => {
-    // Set a cookie so we know their intended role after OAuth redirect
     document.cookie = `pendingRole=${role}; path=/; max-age=3600`
-    // For new users: auth.ts events.createUser will create profiles
-    // For existing users: they'll just sign in and go to dashboard
     signIn('google', { callbackUrl: '/auth/redirect' })
   }
 
   const canSubmit = otpState === 'verified'
+
+  // Whether foreign customer has selected a country
+  const foreignCountrySelected = customerType === 'FOREIGN' && selectedCountryCode && selectedCountryCode !== ''
 
   // ── ROLE SELECTION SCREEN ──────────────────────────────────────────
   if (!role) {
@@ -408,85 +395,13 @@ function SignUpContent() {
     )
   }
 
-  // ── COUNTRY SELECTOR COMPONENT ─────────────────────────────────────
-  const CountrySelector = ({ id, value, onChange, label }: { id: string; value: string; onChange: (code: string) => void; label: string }) => {
-    const [open, setOpen] = useState(false)
-    const [search, setSearch] = useState('')
-    const ref = useRef<HTMLDivElement>(null)
-    const searchInputRef = useRef<HTMLInputElement>(null)
-
-    useEffect(() => {
-      const handler = (e: MouseEvent) => {
-        if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-      }
-      document.addEventListener('mousedown', handler)
-      return () => document.removeEventListener('mousedown', handler)
-    }, [])
-
-    useEffect(() => {
-      if (open) setTimeout(() => searchInputRef.current?.focus(), 50)
-    }, [open])
-
-    const country = getCountryByCode(value)
-    const filtered = search.trim()
-      ? COUNTRIES.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase()))
-      : COUNTRIES
-
-    return (
-      <div>
-        <label htmlFor={id} className="block text-sm font-medium text-gray-700">{label} <span className="text-red-500">*</span></label>
-        <div ref={ref} className="relative mt-1">
-          <button
-            id={id}
-            type="button"
-            onClick={() => setOpen(!open)}
-            className="w-full flex items-center justify-between border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <span>{country ? `${country.flag} ${country.name}` : 'Select...'}</span>
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          </button>
-          {open && (
-            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-hidden">
-              <div className="p-2 border-b">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Search..."
-                    className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="overflow-y-auto max-h-36">
-                {filtered.map(c => (
-                  <button
-                    key={c.code}
-                    type="button"
-                    onClick={() => { onChange(c.code); setOpen(false); setSearch('') }}
-                    className={`w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 flex items-center gap-2 ${value === c.code ? 'bg-blue-50 font-medium' : ''}`}
-                  >
-                    <span>{c.flag}</span>
-                    <span className="flex-1 truncate">{c.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   // ── MAIN FORM ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg border border-gray-100 animate-slideUp motion-reduce:animate-none">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            {role === 'provider' ? 'Create Provider Account' : 'Customer Personal Details'}
+            Create {role === 'provider' ? 'Provider' : 'Customer'} Account
           </h2>
           <button onClick={() => setRole(null)} className="mt-2 text-sm text-blue-600 hover:underline">
             Change account type
@@ -518,74 +433,174 @@ function SignUpContent() {
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             {error && <div className="text-red-500 text-sm text-center">{error}</div>}
-
-            {/* ── CUSTOMER TYPE (Customer only) ──────────────── */}
-            {role === 'customer' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Are you a Local or Foreign Customer? <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-3">
-                  {(['LOCAL', 'FOREIGN'] as const).map(type => (
-                    <label
-                      key={type}
-                      className={`flex-1 flex items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all text-sm ${
-                        customerType === type
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="customerType"
-                        value={type}
-                        checked={customerType === type}
-                        onChange={() => handleCustomerTypeChange(type)}
-                        className="sr-only"
-                      />
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        customerType === type ? 'border-blue-500' : 'border-gray-300'
-                      }`}>
-                        {customerType === type && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                      </div>
-                      <span className="font-medium">{type === 'LOCAL' ? 'Local Customer' : 'Foreign Customer'}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── SHARED FIELDS ─────────────────────────────── */}
+            
             <div>
-              <label htmlFor="signup-name" className="block text-sm font-medium text-gray-700">Full Name <span className="text-red-500">*</span></label>
+              <label htmlFor="signup-name" className="block text-sm font-medium text-gray-700">Full Name</label>
               <input
                 id="signup-name"
                 type="text"
                 required
                 autoComplete="name"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 value={name}
                 onChange={e => setName(e.target.value)}
               />
             </div>
             
             <div>
-              <label htmlFor="signup-email" className="block text-sm font-medium text-gray-700">Email Address <span className="text-red-500">*</span></label>
+              <label htmlFor="signup-email" className="block text-sm font-medium text-gray-700">Email address</label>
               <input
                 id="signup-email"
                 type="email"
                 required
                 autoComplete="email"
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />
             </div>
 
+            <div>
+              <label htmlFor="signup-password" className="block text-sm font-medium text-gray-700">Password</label>
+              <div className="relative mt-1">
+                <input
+                  id="signup-password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="block w-full border border-gray-300 rounded-lg shadow-sm py-2.5 px-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  tabIndex={0}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            
+            <div>
+              <label htmlFor="signup-confirm-password" className="block text-sm font-medium text-gray-700">Confirm Password</label>
+              <div className="relative mt-1">
+                <input
+                  id="signup-confirm-password"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="block w-full border border-gray-300 rounded-lg shadow-sm py-2.5 px-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showConfirmPassword}
+                  tabIndex={0}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
             {/* ── WhatsApp OTP Section ────────────────────────── */}
             {(role === 'customer' || role === 'provider') && (
               <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
-                <label className="block text-sm font-medium text-gray-700">
+
+                {/* ── LOCAL / FOREIGN SELECTOR (Customer only) ──── */}
+                {role === 'customer' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">I am a:</label>
+                    <div className="flex gap-3">
+                      {(['LOCAL', 'FOREIGN'] as const).map(type => (
+                        <label
+                          key={type}
+                          className={`flex-1 flex items-center gap-2 py-2 px-3 rounded-lg border-2 cursor-pointer transition-all text-sm ${
+                            customerType === type
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="customerType"
+                            value={type}
+                            checked={customerType === type}
+                            onChange={() => handleCustomerTypeChange(type)}
+                            className="sr-only"
+                          />
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                            customerType === type ? 'border-blue-500' : 'border-gray-300'
+                          }`}>
+                            {customerType === type && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                          </div>
+                          <span className="font-medium">{type === 'LOCAL' ? 'Local Customer' : 'Foreign Customer'}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── COUNTRY SELECTOR (Foreign Customer only) ──── */}
+                {role === 'customer' && customerType === 'FOREIGN' && (
+                  <div ref={countryDropdownRef} className="relative">
+                    <label htmlFor="whatsapp-country" className="block text-sm font-medium text-gray-700 mb-1">
+                      Country <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      id="whatsapp-country"
+                      type="button"
+                      onClick={() => { setShowCountryDropdown(!showCountryDropdown); setTimeout(() => countrySearchRef.current?.focus(), 50) }}
+                      disabled={otpState !== 'idle'}
+                      className="w-full flex items-center justify-between border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      <span>{selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : 'Select Country...'}</span>
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    </button>
+                    {showCountryDropdown && (
+                      <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-hidden">
+                        <div className="p-2 border-b">
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
+                            <input
+                              ref={countrySearchRef}
+                              type="text"
+                              placeholder="Search country..."
+                              className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              value={countrySearch}
+                              onChange={e => setCountrySearch(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="overflow-y-auto max-h-40">
+                          {filteredCountries.filter(c => c.code !== 'LK').map(c => (
+                            <button
+                              key={c.code}
+                              type="button"
+                              onClick={() => handleCountryChange(c.code)}
+                              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 flex items-center gap-2 ${selectedCountryCode === c.code ? 'bg-blue-50 font-medium' : ''}`}
+                            >
+                              <span>{c.flag}</span>
+                              <span className="flex-1 truncate">{c.name}</span>
+                              <span className="text-gray-400 text-xs">+{c.dialCode}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <label htmlFor="whatsapp-number" className="block text-sm font-medium text-gray-700">
                   WhatsApp Number <span className="text-red-500">*</span>
                 </label>
 
@@ -608,91 +623,55 @@ function SignUpContent() {
                   </div>
                 ) : (
                   <>
-                    {/* ── COUNTRY SELECTOR (Customer only) ──────────── */}
-                    {role === 'customer' && (
-                      <div ref={countryDropdownRef} className="relative">
-                        <label htmlFor="whatsapp-country" className="block text-xs font-medium text-gray-600 mb-1">Country</label>
+                    {/* ── PHONE INPUT + VERIFY BUTTON ──────────────── */}
+                    {/* Foreign: disabled until country selected */}
+                    {role === 'customer' && customerType === 'FOREIGN' && !foreignCountrySelected ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="tel"
+                          disabled
+                          placeholder="Select your country to enter WhatsApp number"
+                          className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm bg-gray-100 text-gray-400 cursor-not-allowed"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <div className="flex items-center px-3 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-600 font-medium whitespace-nowrap">
+                          +{role === 'customer' && customerType === 'FOREIGN' ? (selectedCountry?.dialCode || '??') : '94'}
+                        </div>
+                        <input
+                          id="whatsapp-number"
+                          type="tel"
+                          placeholder={role === 'provider' || (role === 'customer' && customerType === 'LOCAL') ? '0771234567' : 'Phone number'}
+                          autoComplete="tel"
+                          className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          value={whatsappNumber}
+                          onChange={e => handleWhatsappChange(e.target.value)}
+                          disabled={otpState === 'sent' || otpState === 'sending' || otpState === 'verifying'}
+                          aria-describedby="whatsapp-help"
+                        />
                         <button
-                          id="whatsapp-country"
                           type="button"
-                          onClick={() => { setShowCountryDropdown(!showCountryDropdown); setTimeout(() => countrySearchRef.current?.focus(), 50) }}
-                          disabled={otpState !== 'idle'}
-                          className="w-full flex items-center justify-between border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                          onClick={handleSendOtp}
+                          disabled={!isValidPhone(whatsappNumber) || otpState === 'sending' || (otpState === 'sent' && resendCountdown > 0)}
+                          className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap flex items-center gap-1.5"
                         >
-                          <span>{selectedCountry?.flag} {selectedCountry?.name} (+{selectedCountry?.dialCode})</span>
-                          <ChevronDown className="w-4 h-4 text-gray-400" />
+                          {otpState === 'sending' ? (
+                            <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+                          ) : otpState === 'sent' ? (
+                            resendCountdown > 0 ? `Resend (${resendCountdown}s)` : 'Resend Code'
+                          ) : (
+                            'Verify Number'
+                          )}
                         </button>
-                        {showCountryDropdown && (
-                          <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-hidden">
-                            <div className="p-2 border-b">
-                              <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400" />
-                                <input
-                                  ref={countrySearchRef}
-                                  type="text"
-                                  placeholder="Search country..."
-                                  className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                  value={countrySearch}
-                                  onChange={e => setCountrySearch(e.target.value)}
-                                />
-                              </div>
-                            </div>
-                            <div className="overflow-y-auto max-h-40">
-                              {filteredCountries.map(c => (
-                                <button
-                                  key={c.code}
-                                  type="button"
-                                  onClick={() => handleCountryChange(c.code)}
-                                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 flex items-center gap-2 ${selectedCountryCode === c.code ? 'bg-blue-50 font-medium' : ''}`}
-                                >
-                                  <span>{c.flag}</span>
-                                  <span className="flex-1 truncate">{c.name}</span>
-                                  <span className="text-gray-400 text-xs">+{c.dialCode}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )}
-
-                    {/* ── PHONE INPUT + VERIFY BUTTON ──────────────── */}
-                    <div className="flex gap-2">
-                      {role === 'customer' && (
-                        <div className="flex items-center px-3 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-600 font-medium whitespace-nowrap">
-                          +{selectedCountry?.dialCode || '94'}
-                        </div>
-                      )}
-                      <input
-                        id="whatsapp-number"
-                        type="tel"
-                        placeholder={role === 'provider' ? '0771234567' : selectedCountryCode === 'LK' ? '0771234567' : 'Phone number'}
-                        autoComplete="tel"
-                        className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        value={whatsappNumber}
-                        onChange={e => handleWhatsappChange(e.target.value)}
-                        disabled={otpState === 'sent' || otpState === 'sending' || otpState === 'verifying'}
-                        aria-describedby="whatsapp-help"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleSendOtp}
-                        disabled={!isValidPhone(whatsappNumber) || otpState === 'sending' || (otpState === 'sent' && resendCountdown > 0)}
-                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap flex items-center gap-1.5"
-                      >
-                        {otpState === 'sending' ? (
-                          <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
-                        ) : otpState === 'sent' ? (
-                          resendCountdown > 0 ? `Resend (${resendCountdown}s)` : 'Resend Code'
-                        ) : (
-                          'Verify Number'
-                        )}
-                      </button>
-                    </div>
                     <p id="whatsapp-help" className="text-xs text-gray-500">
-                      {role === 'provider' 
-                        ? 'Enter a WhatsApp number in Sri Lankan format, for example 0771234567.'
-                        : `Enter your WhatsApp number. We will send a verification code.`
+                      {role === 'provider' || (role === 'customer' && customerType === 'LOCAL')
+                        ? 'Enter a WhatsApp number in Sri Lankan format, for example 0771234567. We will send a verification code to this number.'
+                        : foreignCountrySelected
+                          ? 'Enter your national phone number. We will send a verification code via WhatsApp.'
+                          : 'Select your country first, then enter your WhatsApp number.'
                       }
                     </p>
 
@@ -764,133 +743,6 @@ function SignUpContent() {
                 )}
               </div>
             )}
-
-            {/* ── CUSTOMER CONDITIONAL FIELDS ─────────────────── */}
-            {role === 'customer' && customerType === 'LOCAL' && (
-              <>
-                <div>
-                  <label htmlFor="nic-number" className="block text-sm font-medium text-gray-700">NIC Number <span className="text-red-500">*</span></label>
-                  <input
-                    id="nic-number"
-                    type="text"
-                    required
-                    placeholder="200011701807 or 901234567V"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    value={nicNumber}
-                    onChange={e => setNicNumber(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="address" className="block text-sm font-medium text-gray-700">Address <span className="text-red-500">*</span></label>
-                  <input
-                    id="address"
-                    type="text"
-                    required
-                    autoComplete="address-line1"
-                    placeholder="Your residential address"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    value={address}
-                    onChange={e => setAddress(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-
-            {role === 'customer' && customerType === 'FOREIGN' && (
-              <>
-                <div>
-                  <label htmlFor="passport-number" className="block text-sm font-medium text-gray-700">Passport Number <span className="text-red-500">*</span></label>
-                  <input
-                    id="passport-number"
-                    type="text"
-                    required
-                    placeholder="AB1234567"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    value={passportNumber}
-                    onChange={e => setPassportNumber(e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <CountrySelector
-                    id="nationality"
-                    value={nationalityCode}
-                    onChange={setNationalityCode}
-                    label="Nationality"
-                  />
-                  <CountrySelector
-                    id="passport-issuing"
-                    value={passportIssuingCode}
-                    onChange={setPassportIssuingCode}
-                    label="Passport Issuing Country"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="address-foreign" className="block text-sm font-medium text-gray-700">Address <span className="text-gray-400 text-xs font-normal">(Optional)</span></label>
-                  <input
-                    id="address-foreign"
-                    type="text"
-                    autoComplete="address-line1"
-                    placeholder="Your current address"
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                    value={address}
-                    onChange={e => setAddress(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-
-            {/* ── PASSWORD FIELDS ──────────────────────────────── */}
-            <div>
-              <label htmlFor="signup-password" className="block text-sm font-medium text-gray-700">Password <span className="text-red-500">*</span></label>
-              <div className="relative mt-1">
-                <input
-                  id="signup-password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                  className="block w-full border border-gray-300 rounded-lg shadow-sm py-2.5 px-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  aria-pressed={showPassword}
-                  tabIndex={0}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-            
-            <div>
-              <label htmlFor="signup-confirm-password" className="block text-sm font-medium text-gray-700">Confirm Password <span className="text-red-500">*</span></label>
-              <div className="relative mt-1">
-                <input
-                  id="signup-confirm-password"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                  className="block w-full border border-gray-300 rounded-lg shadow-sm py-2.5 px-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
-                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                  aria-pressed={showConfirmPassword}
-                  tabIndex={0}
-                >
-                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
 
             <button
               type="submit"
