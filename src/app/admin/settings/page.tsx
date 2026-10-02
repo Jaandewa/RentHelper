@@ -19,6 +19,7 @@ interface SiteSettings {
   smtpPort: number
   smtpUser: string | null
   smtpPass: string | null
+  smtpTestRecipientEmail: string | null
   maintenanceMode: boolean
   allowNewRegistrations: boolean
   defaultTrialDays: number
@@ -528,17 +529,38 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Test Recipient Email */}
+          <div className="admin-form-group" style={{ marginTop: '16px' }}>
+            <label className="admin-form-label">Test Recipient Email</label>
+            <input
+              className="admin-form-input"
+              type="email"
+              value={form.smtpTestRecipientEmail || ''}
+              onChange={e => set('smtpTestRecipientEmail', e.target.value)}
+              placeholder="yourname@gmail.com"
+            />
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#64748b' }}>Used only for SMTP test messages. Save changes before testing.</p>
+          </div>
+
           {/* Send Test Email */}
           <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>Test SMTP Connection</p>
-                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>Sends a test email to your admin email using the saved SMTP config.</p>
+                {form.smtpTestRecipientEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.smtpTestRecipientEmail) ? (
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                    Test email will be sent to: <span style={{ color: '#cbd5e1', fontFamily: 'monospace' }}>
+                      {form.smtpTestRecipientEmail[0]}{form.smtpTestRecipientEmail.slice(1, form.smtpTestRecipientEmail.indexOf('@')).replace(/./g, '-')}@{form.smtpTestRecipientEmail.split('@')[1]}
+                    </span>
+                  </p>
+                ) : (
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>Configure a test recipient email above before testing.</p>
+                )}
               </div>
               <button
                 className="admin-btn admin-btn--secondary"
                 type="button"
-                disabled={testEmailState === 'loading'}
+                disabled={testEmailState === 'loading' || saving || !form.smtpTestRecipientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.smtpTestRecipientEmail)}
                 onClick={async () => {
                   setTestEmailState('loading')
                   setTestEmailMsg('')

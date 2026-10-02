@@ -570,6 +570,7 @@ model SiteSettings {
   smtpPort              Int      @default(587)
   smtpUser              String?
   smtpPass              String?
+  smtpTestRecipientEmail String?
   maintenanceMode       Boolean  @default(false)
   allowNewRegistrations Boolean  @default(true)
   defaultTrialDays      Int      @default(30)
