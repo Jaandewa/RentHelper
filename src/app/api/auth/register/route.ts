@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { verifyVerificationToken, normalizeSriLankanPhone } from '@/lib/otp'
+import { normalizePhoneInternational } from '@/lib/phone'
 
 export async function POST(req: Request) {
   try {
@@ -67,15 +68,35 @@ export async function POST(req: Request) {
       verifiedPhone = tokenPayload.phone
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } })
+    const normalizedEmail = email.trim().toLowerCase()
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } })
     if (existingUser) {
       return NextResponse.json({ message: 'Email already exists' }, { status: 409 })
+    }
+
+    // ── Check phone uniqueness ────────────────────────────────────────
+    let normalizedPhone: string | undefined
+    if (verifiedPhone) {
+      normalizedPhone = normalizePhoneInternational(verifiedPhone) || verifiedPhone
+      
+      const existingCustPhone = await prisma.customerProfile.findFirst({
+        where: { normalizedPhone },
+      })
+      const existingBizPhone = await prisma.business.findFirst({
+        where: { normalizedPhone },
+      })
+      if (existingCustPhone || existingBizPhone) {
+        return NextResponse.json(
+          { message: 'This WhatsApp number is already associated with another account.' },
+          { status: 409 }
+        )
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
     const user = await prisma.user.create({
-      data: { name, email, password: hashedPassword, role },
+      data: { name, email: normalizedEmail, password: hashedPassword, role },
     })
 
     if (role === 'customer') {
@@ -83,6 +104,7 @@ export async function POST(req: Request) {
         data: {
           userId: user.id,
           phone: verifiedPhone,
+          normalizedPhone,
           phoneVerified: true,
           phoneVerifiedAt: new Date(),
         },
@@ -105,6 +127,7 @@ export async function POST(req: Request) {
           name,
           slug,
           phone: verifiedPhone,
+          normalizedPhone,
           phoneVerified: true,
           phoneVerifiedAt: new Date(),
           approvalStatus: 'approved',

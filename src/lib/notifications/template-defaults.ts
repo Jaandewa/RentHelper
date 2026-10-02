@@ -18,6 +18,7 @@ export const WHATSAPP_EVENT_TYPES = [
   'REVIEW_SUBMITTED',
   'DEPOSIT_REFUNDED',
   'DEPOSIT_DEDUCTION_APPLIED',
+  'PASSWORD_RESET',
 ] as const
 
 export type WhatsAppEventType = typeof WHATSAPP_EVENT_TYPES[number]
@@ -36,6 +37,7 @@ export const EVENT_VARIABLES: Record<WhatsAppEventType, string[]> = {
   REVIEW_SUBMITTED: ['recipientName', 'reviewerName', 'bookingId', 'itemName', 'rating', 'reviewText', 'profileUrl', 'supportContact'],
   DEPOSIT_REFUNDED: ['customerName', 'bookingId', 'itemName', 'providerName', 'securityDeposit', 'refundAmount', 'refundMethod', 'refundReference', 'supportContact'],
   DEPOSIT_DEDUCTION_APPLIED: ['customerName', 'bookingId', 'itemName', 'providerName', 'securityDeposit', 'deductionAmount', 'deductionReason', 'refundAmount', 'settlementStatus', 'supportContact'],
+  PASSWORD_RESET: ['appName', 'resetUrl', 'expiryMinutes', 'supportContact'],
 }
 
 /** Preview mock values for admin preview */
@@ -77,6 +79,7 @@ export const PREVIEW_VALUES: Record<string, string> = {
   rating: '5',
   reviewText: 'Excellent service and great equipment quality!',
   returnInstructions: 'Please return to the store at 123 Main Street, Colombo.',
+  resetUrl: 'https://rent.healingcity.lk/reset-password?token=example-token',
 }
 
 export interface TemplateDefault {
@@ -285,6 +288,35 @@ Deduction: Rs. {deductionAmount}
 Reason: {deductionReason}
 Refund amount: Rs. {refundAmount}
 Settlement status: {settlementStatus}
+
+Need help? {supportContact}`,
+  },
+  {
+    eventType: 'PASSWORD_RESET',
+    name: 'Password Reset',
+    description: 'Sent when a user requests a password reset',
+    messageBody: `Hello,
+
+A password reset was requested for your {appName} account.
+
+Please use the link below to reset your password. This link is valid for {expiryMinutes} minutes.
+
+{resetUrl}
+
+If you did not request this, you can ignore this message.
+Need help? {supportContact}`,
+  },
+  {
+    eventType: 'PASSWORD_RESET',
+    name: 'Password Reset Link',
+    description: 'Sent when a user requests a password reset via WhatsApp',
+    messageBody: `You requested a password reset for {appName}.
+
+Reset your password using this secure link:
+{resetUrl}
+
+This link expires in {expiryMinutes} minutes.
+If you did not request this, you can ignore this message.
 
 Need help? {supportContact}`,
   },

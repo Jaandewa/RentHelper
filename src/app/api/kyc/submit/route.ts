@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { normalizeIdentityNumber } from '@/lib/phone'
 
 export async function POST(req: Request) {
   try {
@@ -39,11 +40,60 @@ export async function POST(req: Request) {
       )
     }
 
+    // ── Identity number uniqueness check ──────────────────────────────
+    let identityType: string | null = null
+    let normalizedIdentityNumber: string | null = null
+
+    if (nicNumber) {
+      const normalized = normalizeIdentityNumber(nicNumber)
+      if (normalized) {
+        // Detect type: old NIC (9 digits + V/X), new NIC (12 digits), or passport
+        if (/^\d{9}[VX]$/i.test(normalized) || /^\d{12}$/.test(normalized)) {
+          identityType = 'NIC'
+        } else {
+          identityType = 'PASSPORT'
+        }
+        normalizedIdentityNumber = normalized
+
+        // Check uniqueness (exclude current customer)
+        const existingIdentity = await prisma.customerProfile.findFirst({
+          where: {
+            identityType,
+            normalizedIdentityNumber: normalized,
+            id: { not: customer.id },
+          },
+        })
+
+        // Also check legacy nicNumber field
+        if (!existingIdentity) {
+          const legacyMatch = await prisma.customerProfile.findFirst({
+            where: {
+              nicNumber: { equals: normalized, mode: 'insensitive' },
+              id: { not: customer.id },
+            },
+          })
+          if (legacyMatch) {
+            return NextResponse.json(
+              { message: 'This identity document is already associated with another account. Please use a different valid document or contact support if you believe this is an error.' },
+              { status: 409 }
+            )
+          }
+        } else {
+          return NextResponse.json(
+            { message: 'This identity document is already associated with another account. Please use a different valid document or contact support if you believe this is an error.' },
+            { status: 409 }
+          )
+        }
+      }
+    }
+
     // Update customer profile with submitted data
     await prisma.customerProfile.update({
       where: { id: customer.id },
       data: {
         nicNumber: nicNumber || null,
+        identityType,
+        normalizedIdentityNumber,
         phone: phone || null,
         phone2: phone2 || null,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,

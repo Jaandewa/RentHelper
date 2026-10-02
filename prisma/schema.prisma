@@ -82,6 +82,7 @@ model Business {
   slug                   String    @unique
   description            String?
   phone                  String?
+  normalizedPhone        String?   @unique // E.164 digits-only, e.g. 94771234567
   phoneVerified          Boolean   @default(false)
   phoneVerifiedAt        DateTime?
   address                String?
@@ -155,11 +156,14 @@ model Category {
 model CustomerProfile {
   id                      String    @id @default(cuid())
   userId                  String    @unique
-  nicNumber               String?
-  nicNumberEncrypted      String?
-  phone                   String?
-  phoneVerified           Boolean   @default(false)
-  phoneVerifiedAt         DateTime?
+  nicNumber                  String?
+  nicNumberEncrypted         String?
+  identityType               String?   // NIC, PASSPORT
+  normalizedIdentityNumber   String?   // Uppercase, trimmed
+  phone                      String?
+  normalizedPhone            String?   @unique // E.164 digits-only
+  phoneVerified              Boolean   @default(false)
+  phoneVerifiedAt            DateTime?
   phone2                  String?
   dateOfBirth             DateTime?
   emergencyContact        String?
@@ -187,7 +191,9 @@ model CustomerProfile {
   kycApprovals      KYCApproval[]
   blacklistEntries  BlacklistEntry[]
 
+  @@unique([identityType, normalizedIdentityNumber])
   @@index([userId])
+  @@index([normalizedIdentityNumber])
   @@map("customer_profiles")
 }
 
@@ -763,4 +769,20 @@ model PasswordResetToken {
   @@index([userId])
   @@index([tokenHash])
   @@map("password_reset_tokens")
+}
+
+model PasswordRecoveryRequest {
+  id               String    @id @default(cuid())
+  userId           String
+  identifierHash   String    // SHA-256 of the normalized lookup identifier
+  sessionToken     String    // Bind to browser session
+  availableChannels String   // JSON array of channel IDs
+  selectedChannel  String?   // email or whatsapp
+  sentAt           DateTime?
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+
+  @@index([identifierHash])
+  @@index([sessionToken])
+  @@map("password_recovery_requests")
 }

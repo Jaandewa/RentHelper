@@ -494,3 +494,13 @@ export async function sendDepositDeductionWhatsApp(
   if (result.skipped) return { success: true, skipped: true }
   return sendWhatsAppText(customerPhone, result.message, { eventType: 'DEPOSIT_DEDUCTION_APPLIED' })
 }
+
+export async function sendTemplatedWhatsApp(
+  phone: string,
+  eventType: any,
+  data: Record<string, string>
+) {
+  const result = await renderWhatsAppTemplate(eventType, data)
+  if (result.skipped) return { success: true, skipped: true }
+  return sendWhatsAppText(phone, result.message, { eventType })
+}
