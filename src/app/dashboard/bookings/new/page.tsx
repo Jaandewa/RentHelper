@@ -98,15 +98,68 @@ function NewBookingInner() {
       }
     }
 
+
     loadData()
   }, [preselectedCustomerId])
 
-  const filteredCustomers = customers.filter(c =>
-    c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    c.phone.includes(customerSearch) ||
-    c.displayId.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    c.email.toLowerCase().includes(customerSearch.toLowerCase())
-  )
+  // Server-side search for all registered customers (Section 1)
+  const [searchResults, setSearchResults] = useState<CustomerOption[]>([])
+  const [isSearchingCustomers, setIsSearchingCustomers] = useState(false)
+
+  // Existing customers who booked with this provider (Section 2)
+  const [existingCustomers, setExistingCustomers] = useState<any[]>([])
+  const [loadingExisting, setLoadingExisting] = useState(true)
+
+  useEffect(() => {
+    async function loadExisting() {
+      setLoadingExisting(true)
+      try {
+        const res = await fetch('/api/provider/booking-customers/existing')
+        if (res.ok) {
+          const data = await res.json()
+          setExistingCustomers(data.customers || [])
+        }
+      } catch (err) {
+        console.error('Failed to load existing customers:', err)
+      } finally {
+        setLoadingExisting(false)
+      }
+    }
+    loadExisting()
+  }, [])
+
+  // Debounced server-side search
+  useEffect(() => {
+    if (!customerSearch.trim()) {
+      setSearchResults([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingCustomers(true)
+      try {
+        const res = await fetch(`/api/provider/booking-customers/search?q=${encodeURIComponent(customerSearch.trim())}`)
+        if (res.ok) {
+          const data = await res.json()
+          const formatted = (data.customers || []).map((c: any) => ({
+            id: c.id,
+            displayId: c.displayId,
+            name: c.fullName || 'Customer',
+            phone: c.maskedPhone || 'N/A',
+            email: c.maskedEmail || '',
+            kycStatus: c.kycStatus || 'not_submitted',
+            trustScore: c.trustScore || 0,
+          }))
+          setSearchResults(formatted)
+        }
+      } catch (err) {
+        console.error('Customer search error:', err)
+      } finally {
+        setIsSearchingCustomers(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [customerSearch])
+
 
   const filteredItems = items.filter(i =>
     (i.name.toLowerCase().includes(itemSearch.toLowerCase()) || (i.sku && i.sku.toLowerCase().includes(itemSearch.toLowerCase()))) &&
@@ -210,53 +263,172 @@ function NewBookingInner() {
 
       {/* Step 1: Select Customer */}
       {step === 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-            <User className="w-5 h-5 text-blue-600" /> Select Customer
-          </h2>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search customer by ID, name, email, or phone..."
-              className="pl-9 pr-4 py-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={customerSearch}
-              onChange={e => setCustomerSearch(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2 max-h-72 overflow-y-auto">
-            {filteredCustomers.map(c => (
+        <div className="space-y-6">
+          {/* Selected Customer Summary */}
+          {selectedCustomer && (
+            <div className="bg-blue-50 border-2 border-blue-500 rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold">
+                  {selectedCustomer.name.charAt(0)}
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 flex items-center gap-2">
+                    Selected Customer
+                    <span className="font-mono text-xs text-blue-600 bg-white px-2 py-0.5 rounded-full">{selectedCustomer.displayId}</span>
+                  </p>
+                  <p className="text-sm text-gray-700">{selectedCustomer.name} • {selectedCustomer.phone}</p>
+                </div>
+              </div>
               <button
-                key={c.id}
-                onClick={() => setSelectedCustomer(c)}
-                className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-colors text-left ${
-                  selectedCustomer?.id === c.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                }`}
+                onClick={() => setSelectedCustomer(null)}
+                className="text-gray-400 hover:text-red-500 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold">
-                    {c.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900 flex items-center gap-2">
-                      {c.name} <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{c.displayId}</span>
-                    </p>
-                    <p className="text-sm text-gray-500">{c.phone} • {c.email}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${c.kycStatus === 'verified' || c.kycStatus === 'approved' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
-                    {c.kycStatus}
-                  </span>
-                  {c.trustScore > 0 && <p className="text-xs text-gray-500 mt-1">★ {c.trustScore.toFixed(1)}</p>}
-                </div>
+                <X className="w-5 h-5" />
               </button>
-            ))}
+            </div>
+          )}
+
+          {/* Section 1: Search All Registered Customers */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Search className="w-5 h-5 text-blue-600" /> Search All Registered Customers
+            </h2>
+            <p className="text-sm text-gray-500">Find any registered customer by name, phone, ID number, or email</p>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name, phone, customer ID, NIC, passport, or email..."
+                className="pl-9 pr-10 py-2.5 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={customerSearch}
+                onChange={e => setCustomerSearch(e.target.value)}
+              />
+              {isSearchingCustomers && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-600 animate-spin" />
+              )}
+            </div>
+
+            {/* Search Results */}
+            {customerSearch.trim() && (
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {isSearchingCustomers ? (
+                  <div className="py-6 text-center text-gray-500 text-sm">
+                    <Loader2 className="w-5 h-5 text-blue-600 animate-spin mx-auto mb-1" />
+                    Searching customers...
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map(c => (
+                    <button
+                      key={c.id}
+                      onClick={() => { setSelectedCustomer(c); setCustomerSearch('') }}
+                      className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-colors text-left ${
+                        selectedCustomer?.id === c.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold">
+                          {c.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 flex items-center gap-2">
+                            {c.name} <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{c.displayId}</span>
+                          </p>
+                          <p className="text-sm text-gray-500">{c.phone} • {c.email}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${c.kycStatus === 'verified' || c.kycStatus === 'approved' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {c.kycStatus === 'verified' || c.kycStatus === 'approved' ? 'Verified' : c.kycStatus}
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="py-6 text-center text-gray-500 text-sm">
+                    No customers found matching &quot;{customerSearch}&quot;
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-gray-100">
+              <Link href="/dashboard/customers/new" className="flex items-center gap-2 text-sm text-blue-600 hover:underline font-medium">
+                <Plus className="w-4 h-4" /> Add new customer
+              </Link>
+            </div>
           </div>
-          <div className="pt-2 border-t border-gray-100">
-            <Link href="/dashboard/customers/new" className="flex items-center gap-2 text-sm text-blue-600 hover:underline font-medium">
-              <Plus className="w-4 h-4" /> Add new customer
-            </Link>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-gray-50 px-3 text-sm text-gray-500">or select from</span>
+            </div>
+          </div>
+
+          {/* Section 2: Existing Customers */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <User className="w-5 h-5 text-blue-600" /> Existing Customers
+            </h2>
+            <p className="text-sm text-gray-500">Customers who previously booked from your business</p>
+
+            {loadingExisting ? (
+              <div className="py-6 text-center text-gray-500 text-sm">
+                <Loader2 className="w-5 h-5 text-blue-600 animate-spin mx-auto mb-1" />
+                Loading your customers...
+              </div>
+            ) : existingCustomers.length > 0 ? (
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {existingCustomers.map((c: any) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedCustomer({
+                      id: c.id,
+                      displayId: c.displayId,
+                      name: c.fullName,
+                      phone: c.maskedPhone || 'N/A',
+                      email: c.maskedEmail || '',
+                      kycStatus: c.kycStatus || 'not_submitted',
+                      trustScore: c.trustScore || 0,
+                    })}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-colors text-left ${
+                      selectedCustomer?.id === c.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold">
+                        {(c.fullName || 'C').charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 flex items-center gap-2">
+                          {c.fullName} <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{c.displayId}</span>
+                        </p>
+                        <p className="text-sm text-gray-500">{c.maskedPhone} • {c.maskedEmail}</p>
+                        {c.lastBooking && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            Last: {c.lastBooking.itemName || 'Booking'} — {new Date(c.lastBooking.date).toLocaleDateString()} — <span className="font-medium">{c.lastBooking.status}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${c.kycStatus === 'verified' || c.kycStatus === 'approved' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                        {c.kycStatus === 'verified' || c.kycStatus === 'approved' ? 'Verified' : c.kycStatus || 'Not verified'}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-gray-400 text-sm">
+                <User className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                <p className="font-medium text-gray-500">No customers have booked from your business yet.</p>
+                <p className="text-xs mt-1">Use the search above to find and select a registered customer.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
