@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { getCustomerDisplayId } from '@/app/api/provider/customers/route'
+import { normalizeIdentityNumber } from '@/lib/phone'
 
 function maskPhone(phone: string | null): string {
   if (!phone) return 'N/A'
@@ -22,36 +23,50 @@ export async function GET(req: Request) {
     const session = await auth()
     
     if (!session?.user || (session.user.role !== 'provider' && session.user.role !== 'admin')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ customers: [], error: 'Unauthorized' }, { status: 401 })
     }
 
     const { searchParams } = new URL(req.url)
     const q = searchParams.get('q')
 
     if (!q || q.trim() === '') {
-      return NextResponse.json({ data: [] })
+      return NextResponse.json({ customers: [] })
     }
 
     const searchString = q.trim()
+    const normalizedSearch = normalizeIdentityNumber(searchString)
+    const cleanSearch = searchString.toLowerCase().replace(/^cus-/, '')
+
+    // Build OR conditions for search
+    const orConditions: any[] = [
+      { user: { name: { contains: searchString, mode: 'insensitive' } } },
+      { user: { email: { contains: searchString, mode: 'insensitive' } } },
+      { phone: { contains: searchString, mode: 'insensitive' } },
+      { normalizedPhone: { contains: searchString, mode: 'insensitive' } },
+      { id: { contains: cleanSearch, mode: 'insensitive' } },
+    ]
+
+    // Search identity fields: normalizedIdentityNumber AND legacy nicNumber
+    if (normalizedSearch) {
+      orConditions.push(
+        { normalizedIdentityNumber: { equals: normalizedSearch, mode: 'insensitive' } },
+        { nicNumber: { contains: searchString, mode: 'insensitive' } },
+      )
+    }
 
     const customers = await prisma.customerProfile.findMany({
       where: {
         user: {
-          role: 'customer'
+          role: { in: ['customer', 'CUSTOMER', 'Customer'] },
         },
-        OR: [
-          { user: { name: { contains: searchString, mode: 'insensitive' } } },
-          { user: { email: { contains: searchString, mode: 'insensitive' } } },
-          { phone: { contains: searchString, mode: 'insensitive' } },
-          { normalizedPhone: { contains: searchString, mode: 'insensitive' } },
-          { id: { contains: searchString, mode: 'insensitive' } },
-          { normalizedIdentityNumber: { contains: searchString, mode: 'insensitive' } }
-        ]
+        OR: orConditions,
       },
       include: {
-        user: true
+        user: {
+          select: { name: true, email: true },
+        },
       },
-      take: 15
+      take: 15,
     })
 
     const safeResults = customers.map(customer => ({
@@ -60,14 +75,15 @@ export async function GET(req: Request) {
       fullName: customer.user.name || 'Unknown',
       maskedPhone: maskPhone(customer.phone),
       maskedEmail: maskEmail(customer.user.email),
-      customerType: customer.customerType,
+      customerType: customer.customerType || 'LOCAL',
+      identityType: customer.identityType || null,
       kycStatus: customer.kycStatus,
-      trustScore: customer.trustScore
+      trustScore: customer.trustScore,
     }))
 
-    return NextResponse.json({ data: safeResults })
+    return NextResponse.json({ customers: safeResults })
   } catch (error) {
     console.error('Error searching booking customers:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ customers: [], error: 'Internal server error' }, { status: 500 })
   }
 }

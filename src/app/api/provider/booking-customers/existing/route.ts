@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     })
 
     if (!business) {
-      return NextResponse.json({ data: [] })
+      return NextResponse.json({ customers: [] })
     }
 
     // Find distinct customer IDs who have booked with this business
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     const customerIds = distinctBookings.map(b => b.customerId)
     
     if (customerIds.length === 0) {
-      return NextResponse.json({ data: [] })
+      return NextResponse.json({ customers: [] })
     }
 
     // Fetch customer profiles for those IDs
@@ -87,7 +87,7 @@ export async function GET(req: Request) {
       }
     }))
 
-    return NextResponse.json({ data: results })
+    return NextResponse.json({ customers: results })
   } catch (error) {
     console.error('Error fetching existing customers:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
