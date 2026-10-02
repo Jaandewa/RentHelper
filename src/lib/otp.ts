@@ -108,13 +108,14 @@ function getSecret(): string {
  */
 export function signVerificationToken(
   phone: string,
-  challengeId: string
+  challengeId: string,
+  purpose: string = 'REGISTRATION_WHATSAPP'
 ): { token: string; expiresAt: Date } {
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000)
   
   const payload = {
     phone,
-    purpose: 'REGISTRATION_WHATSAPP',
+    purpose,
     challengeId,
     exp: expiresAt.getTime(),
   }
@@ -134,7 +135,8 @@ export function signVerificationToken(
  * Returns the payload if valid, null if invalid/expired/tampered.
  */
 export function verifyVerificationToken(
-  token: string
+  token: string,
+  allowedPurposes: string[] = ['REGISTRATION_WHATSAPP']
 ): { phone: string; purpose: string; challengeId: string; exp: number } | null {
   try {
     const parts = token.split('.')
@@ -156,7 +158,7 @@ export function verifyVerificationToken(
     if (Date.now() > payload.exp) return null
     
     // Check purpose
-    if (payload.purpose !== 'REGISTRATION_WHATSAPP') return null
+    if (!allowedPurposes.includes(payload.purpose)) return null
     
     return payload
   } catch {

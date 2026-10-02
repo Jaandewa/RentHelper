@@ -25,7 +25,7 @@ function SignUpContent() {
   )
   const [isLoading, setIsLoading] = useState(false)
 
-  // WhatsApp OTP state (customer only)
+  // WhatsApp OTP state (customer and provider)
   const [whatsappNumber, setWhatsappNumber] = useState('')
   const [otpState, setOtpState] = useState<OtpState>('idle')
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', ''])
@@ -71,7 +71,11 @@ function SignUpContent() {
     setOtpDigits(['', '', '', '', '', ''])
 
     try {
-      const res = await fetch('/api/auth/registration/send-whatsapp-otp', {
+      const otpEndpoint = role === 'provider'
+        ? '/api/auth/provider-registration/send-whatsapp-otp'
+        : '/api/auth/registration/send-whatsapp-otp'
+
+      const res = await fetch(otpEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -152,7 +156,11 @@ function SignUpContent() {
     setOtpError('')
 
     try {
-      const res = await fetch('/api/auth/registration/verify-whatsapp-otp', {
+      const verifyEndpoint = role === 'provider'
+        ? '/api/auth/provider-registration/verify-whatsapp-otp'
+        : '/api/auth/registration/verify-whatsapp-otp'
+
+      const res = await fetch(verifyEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ challengeId, otp, sessionToken }),
@@ -194,7 +202,7 @@ function SignUpContent() {
       return
     }
 
-    if (role === 'customer' && otpState !== 'verified') {
+    if ((role === 'customer' || role === 'provider') && otpState !== 'verified') {
       setError('Please verify your WhatsApp number first.')
       return
     }
@@ -205,7 +213,7 @@ function SignUpContent() {
     try {
       const payload: Record<string, string> = { name, email, password, role: role! }
       
-      if (role === 'customer') {
+      if (role === 'customer' || role === 'provider') {
         payload.whatsappNumber = whatsappNumber
         payload.registrationVerificationToken = verificationToken
       }
@@ -253,7 +261,7 @@ function SignUpContent() {
     signIn('google', { callbackUrl: '/auth/redirect' })
   }
 
-  const canSubmit = role === 'customer' ? otpState === 'verified' : true
+  const canSubmit = otpState === 'verified'
 
   if (!role) {
     return (
@@ -378,8 +386,8 @@ function SignUpContent() {
               />
             </div>
 
-            {/* ── WhatsApp OTP Section (Customer only) ────────────────── */}
-            {role === 'customer' && (
+            {/* ── WhatsApp OTP Section ────────────────── */}
+            {(role === 'customer' || role === 'provider') && (
               <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
                 <label htmlFor="whatsapp-number" className="block text-sm font-medium text-gray-700">
                   WhatsApp Number <span className="text-red-500">*</span>
@@ -516,7 +524,7 @@ function SignUpContent() {
               {isLoading ? 'Creating account...' : 'Create Account'}
             </button>
             
-            {role === 'customer' && otpState !== 'verified' && (
+            {otpState !== 'verified' && (
               <p className="text-xs text-center text-gray-400">
                 Please verify your WhatsApp number to enable account creation.
               </p>

@@ -80,6 +80,8 @@ model Business {
   slug                   String    @unique
   description            String?
   phone                  String?
+  phoneVerified          Boolean   @default(false)
+  phoneVerifiedAt        DateTime?
   address                String?
   city                   String?
   logo                   String?

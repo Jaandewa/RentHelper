@@ -12,10 +12,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Missing fields' }, { status: 400 })
     }
 
-    // ── Customer-specific: require WhatsApp OTP verification ──────────
+    // ── Require WhatsApp OTP verification for both customer and provider ──
     let verifiedPhone: string | undefined
 
-    if (role === 'customer') {
+    if (role === 'customer' || role === 'provider') {
       if (!registrationVerificationToken || !whatsappNumber) {
         return NextResponse.json(
           { message: 'WhatsApp number verification is required before continuing.' },
@@ -23,8 +23,13 @@ export async function POST(req: Request) {
         )
       }
 
+      // Determine expected purpose based on role
+      const expectedPurpose = role === 'provider'
+        ? 'PROVIDER_REGISTRATION_WHATSAPP'
+        : 'REGISTRATION_WHATSAPP'
+
       // Verify server-signed token
-      const tokenPayload = verifyVerificationToken(registrationVerificationToken)
+      const tokenPayload = verifyVerificationToken(registrationVerificationToken, [expectedPurpose])
       if (!tokenPayload) {
         return NextResponse.json(
           { message: 'Verification token is invalid or expired. Please verify your WhatsApp number again.' },
@@ -99,7 +104,10 @@ export async function POST(req: Request) {
           userId: user.id,
           name,
           slug,
-          approvalStatus: 'approved', // providers auto-approved; only customers need KYC review
+          phone: verifiedPhone,
+          phoneVerified: true,
+          phoneVerifiedAt: new Date(),
+          approvalStatus: 'approved',
         },
       })
 
