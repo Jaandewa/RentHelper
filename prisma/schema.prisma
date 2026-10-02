@@ -19,8 +19,9 @@ model User {
   status          String    @default("active") // active, suspended, banned
   suspendedUntil  DateTime?
   suspendReason   String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  passwordChangedAt  DateTime?
 
   accounts        Account[]
   sessions        Session[]
@@ -28,6 +29,7 @@ model User {
   customerProfile CustomerProfile?
   activityLogs    ActivityLog[]
   addedBlacklists BlacklistEntry[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -746,4 +748,19 @@ model DepositSettlement {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("deposit_settlements")
+}
+
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  userId      String
+  tokenHash   String    // SHA-256 hash of the raw token
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
 }

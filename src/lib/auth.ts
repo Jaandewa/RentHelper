@@ -68,6 +68,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               include: { businessProfile: true, customerProfile: true },
             })
             if (dbUser) {
+              // Invalidate session if password was changed after token issued
+              if (dbUser.passwordChangedAt && token.iat) {
+                const tokenIssuedAt = (token.iat as number) * 1000 // JWT iat is in seconds
+                if (dbUser.passwordChangedAt.getTime() > tokenIssuedAt) {
+                  return {} // Force re-login
+                }
+              }
               token.role = dbUser.role
               token.businessCompleted = Boolean(dbUser.businessProfile)
               token.kycStatus = dbUser.customerProfile?.kycStatus || 'not_submitted'
