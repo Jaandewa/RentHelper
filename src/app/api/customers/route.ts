@@ -10,6 +10,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
     }
 
+    const role = session.user.role?.toLowerCase()
+    if (role !== 'provider' && role !== 'admin') {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
+
     const business = await prisma.business.findFirst({
       where: { userId: session.user.id }
     })
@@ -24,7 +29,9 @@ export async function GET(req: Request) {
       }
     }
 
-    if (business) {
+    if (role === 'admin') {
+      // Admin sees all customers
+    } else if (business) {
       const existingBookings = await prisma.booking.findMany({
         where: { businessId: business.id },
         select: { customerId: true },
@@ -32,10 +39,13 @@ export async function GET(req: Request) {
       })
       const existingCustomerIds = existingBookings.map(b => b.customerId)
 
-      where.OR = [
-        { allowCrossProviderShare: true },
-        { id: { in: existingCustomerIds } },
-      ]
+      if (existingCustomerIds.length === 0) {
+        return NextResponse.json([])
+      }
+
+      where.id = { in: existingCustomerIds }
+    } else {
+      return NextResponse.json([])
     }
 
     if (q) {
@@ -130,6 +140,11 @@ export async function POST(req: Request) {
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    }
+
+    const role = session.user.role?.toLowerCase()
+    if (role !== 'provider' && role !== 'admin') {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
     }
 
     const body = await req.json()

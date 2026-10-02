@@ -22,9 +22,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ customers: [] })
     }
 
+    // Strict scope: only provider's own customers
     const business = await prisma.business.findFirst({
       where: { userId: session.user.id },
     })
+
+    if (!business) {
+      return NextResponse.json({ customers: [] })
+    }
+
+    const existingBookings = await prisma.booking.findMany({
+      where: { businessId: business.id },
+      select: { customerId: true },
+      distinct: ['customerId'],
+    })
+    const existingCustomerIds = existingBookings.map(b => b.customerId)
+
+    if (existingCustomerIds.length === 0) {
+      return NextResponse.json({ customers: [] })
+    }
 
     const cleanSearch = q.toLowerCase().replace(/^cus-/, '')
     const digitsOnly = q.replace(/[^0-9]/g, '')
@@ -34,21 +50,9 @@ export async function GET(req: NextRequest) {
       user: {
         role: { in: ['customer', 'CUSTOMER', 'Customer'] },
       },
+      id: { in: existingCustomerIds }
     }
 
-    if (business) {
-      const existingBookings = await prisma.booking.findMany({
-        where: { businessId: business.id },
-        select: { customerId: true },
-        distinct: ['customerId'],
-      })
-      const existingCustomerIds = existingBookings.map(b => b.customerId)
-
-      where.OR = [
-        { allowCrossProviderShare: true },
-        { id: { in: existingCustomerIds } },
-      ]
-    }
 
     const ORConditions: any[] = [
       { user: { name: { contains: q, mode: 'insensitive' } } },

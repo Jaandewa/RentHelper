@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Users, Plus, Search, Phone, Mail, Star, Eye, Calendar, Loader2, AlertTriangle, CheckCircle, Clock, XCircle, ChevronRight } from 'lucide-react'
+import { Users, Plus, Search, Phone, Star, Eye, Calendar, Loader2, ChevronRight } from 'lucide-react'
 
 interface CustomerItem {
   id: string
@@ -21,14 +21,7 @@ interface CustomerItem {
   createdAt: string
 }
 
-const KYC_BADGE: Record<string, { label: string; color: string }> = {
-  verified: { label: 'Verified ✓', color: 'bg-green-100 text-green-800' },
-  approved: { label: 'Verified ✓', color: 'bg-green-100 text-green-800' },
-  pending: { label: 'Pending Review', color: 'bg-amber-100 text-amber-800' },
-  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800' },
-  needs_more_info: { label: 'Needs Info', color: 'bg-blue-100 text-blue-800' },
-  not_submitted: { label: 'Not Submitted', color: 'bg-gray-100 text-gray-700' },
-}
+
 
 function TrustStars({ score }: { score: number }) {
   if (!score || score === 0) return <span className="text-xs text-gray-400">No ratings</span>
@@ -45,7 +38,7 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerItem[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [kycFilter, setKycFilter] = useState('all')
+
 
   // Search & Autocomplete State
   const [search, setSearch] = useState('')
@@ -60,7 +53,6 @@ export default function CustomersPage() {
     try {
       const params = new URLSearchParams()
       if (search) params.set('q', search)
-      if (kycFilter !== 'all') params.set('kycStatus', kycFilter)
 
       const res = await fetch(`/api/provider/customers?${params}`)
       if (res.ok) {
@@ -73,7 +65,7 @@ export default function CustomersPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [search, kycFilter])
+  }, [search])
 
   useEffect(() => {
     fetchCustomers()
@@ -142,18 +134,14 @@ export default function CustomersPage() {
 
   // Summary Card Statistics
   const verifiedCount = customers.filter(c => c.kycStatus === 'verified' || c.kycStatus === 'approved').length
-  const pendingCount = customers.filter(c => c.kycStatus === 'pending').length
-  const needsActionCount = customers.filter(c => 
-    c.kycStatus === 'rejected' || c.kycStatus === 'needs_more_info' || c.kycStatus === 'not_submitted' || c.accountStatus === 'suspended'
-  ).length
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Customers Directory</h1>
-          <p className="text-sm text-gray-500 mt-1">{totalCount} registered customers discoverable</p>
+          <h1 className="text-2xl font-bold text-gray-900">My Customers</h1>
+          <p className="text-sm text-gray-500 mt-1">{totalCount} customers who have booked with you</p>
         </div>
         <Link
           href="/dashboard/customers/new"
@@ -164,12 +152,10 @@ export default function CustomersPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {[
           { label: 'Total', value: totalCount, color: 'text-gray-900', bg: 'bg-white' },
           { label: 'Verified', value: verifiedCount, color: 'text-green-700', bg: 'bg-green-50' },
-          { label: 'Pending KYC', value: pendingCount, color: 'text-amber-700', bg: 'bg-amber-50' },
-          { label: 'Needs Action', value: needsActionCount, color: 'text-red-700', bg: 'bg-red-50' },
         ].map(stat => (
           <div key={stat.label} className={`${stat.bg} rounded-xl border border-gray-200 shadow-sm p-4`}>
             <p className="text-sm text-gray-500">{stat.label}</p>
@@ -232,19 +218,6 @@ export default function CustomersPage() {
               </div>
             )}
           </div>
-
-          <select
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={kycFilter}
-            onChange={e => setKycFilter(e.target.value)}
-          >
-            <option value="all">All KYC Status</option>
-            <option value="verified">Verified</option>
-            <option value="pending">Pending Review</option>
-            <option value="needs_more_info">Needs More Info</option>
-            <option value="rejected">Rejected</option>
-            <option value="not_submitted">Not Submitted</option>
-          </select>
         </div>
       </div>
 
@@ -253,7 +226,7 @@ export default function CustomersPage() {
         {isLoading ? (
           <div className="p-12 text-center text-gray-500">
             <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-2" />
-            Loading discoverable customer directory...
+            Loading your customers...
           </div>
         ) : (
           <table className="w-full">
@@ -262,7 +235,7 @@ export default function CustomersPage() {
                 <th className="px-6 py-3">Customer</th>
                 <th className="px-6 py-3">Contact</th>
                 <th className="px-6 py-3">Customer ID</th>
-                <th className="px-6 py-3">KYC Status</th>
+
                 <th className="px-6 py-3">Trust Score</th>
                 <th className="px-6 py-3">Bookings</th>
                 <th className="px-6 py-3 text-right">Actions</th>
@@ -270,7 +243,6 @@ export default function CustomersPage() {
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
               {customers.map(customer => {
-                const badge = KYC_BADGE[customer.kycStatus] || KYC_BADGE.not_submitted
                 const isBlacklisted = customer.blacklistStatus !== 'NONE'
 
                 return (
@@ -300,11 +272,7 @@ export default function CustomersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 font-mono text-xs font-semibold text-blue-700">{customer.displayId}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${badge.color}`}>
-                        {badge.label}
-                      </span>
-                    </td>
+
                     <td className="px-6 py-4">
                       <TrustStars score={customer.trustScore} />
                     </td>
@@ -335,8 +303,8 @@ export default function CustomersPage() {
         {!isLoading && customers.length === 0 && (
           <div className="py-16 text-center text-gray-500">
             <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p className="text-base font-semibold text-gray-700">No customers found</p>
-            <p className="text-xs text-gray-400 mt-1">Try broadening your search query or KYC status filter.</p>
+            <p className="text-base font-semibold text-gray-700">No customers yet</p>
+            <p className="text-xs text-gray-400 mt-1">Customers will appear here once they book with your business.</p>
           </div>
         )}
       </div>

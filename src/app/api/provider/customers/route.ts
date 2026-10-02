@@ -47,15 +47,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'Forbidden — Providers only' }, { status: 403 })
     }
 
-    await ensureCustomerProfilesExist()
-
     const business = await prisma.business.findFirst({
       where: { userId: session.user.id },
     })
 
     const { searchParams } = new URL(req.url)
     const search = (searchParams.get('q') || searchParams.get('search') || '').trim()
-    const kycStatus = searchParams.get('kycStatus')
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '50', 10)
     const skip = (page - 1) * limit
@@ -67,7 +64,7 @@ export async function GET(req: NextRequest) {
       },
     }
 
-    // Privacy filter: allow cross-provider share OR customer has booked with this provider
+    // Strict scope: only customers who have booked with this provider's business
     if (business) {
       const existingBookings = await prisma.booking.findMany({
         where: { businessId: business.id },
@@ -76,10 +73,24 @@ export async function GET(req: NextRequest) {
       })
       const existingCustomerIds = existingBookings.map(b => b.customerId)
 
-      where.OR = [
-        { allowCrossProviderShare: true },
-        { id: { in: existingCustomerIds } },
-      ]
+      if (existingCustomerIds.length === 0) {
+        return NextResponse.json({
+          customers: [],
+          total: 0,
+          page,
+          limit,
+        })
+      }
+
+      where.id = { in: existingCustomerIds }
+    } else {
+      // No business profile — return empty
+      return NextResponse.json({
+        customers: [],
+        total: 0,
+        page,
+        limit,
+      })
     }
 
     // Search filter
@@ -102,9 +113,6 @@ export async function GET(req: NextRequest) {
       ]
     }
 
-    if (kycStatus && kycStatus !== 'all') {
-      where.kycStatus = kycStatus
-    }
 
     const [customers, total] = await Promise.all([
       prisma.customerProfile.findMany({
