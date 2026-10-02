@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Save, Eye, EyeOff, Palette, Globe, Mail, CreditCard, Shield, CheckCircle, Package } from 'lucide-react'
+import { Save, Eye, EyeOff, Palette, Globe, Mail, CreditCard, Shield, CheckCircle, Package, Loader2, SendHorizonal } from 'lucide-react'
 
 interface SiteSettings {
   id: string
@@ -97,6 +97,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [activeTab, setActiveTab] = useState('branding')
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
+  const [testEmailState, setTestEmailState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [testEmailMsg, setTestEmailMsg] = useState('')
 
   useEffect(() => {
     fetch('/api/admin/settings')
@@ -524,6 +526,56 @@ export default function SettingsPage() {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Send Test Email */}
+          <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>Test SMTP Connection</p>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>Sends a test email to your admin email using the saved SMTP config.</p>
+              </div>
+              <button
+                className="admin-btn admin-btn--secondary"
+                type="button"
+                disabled={testEmailState === 'loading'}
+                onClick={async () => {
+                  setTestEmailState('loading')
+                  setTestEmailMsg('')
+                  try {
+                    const res = await fetch('/api/admin/email/test', { method: 'POST' })
+                    const data = await res.json()
+                    if (data.success) {
+                      setTestEmailState('success')
+                      setTestEmailMsg('Test email sent successfully.')
+                    } else {
+                      setTestEmailState('error')
+                      setTestEmailMsg(data.error || 'Failed to send test email.')
+                    }
+                  } catch {
+                    setTestEmailState('error')
+                    setTestEmailMsg('Network error. Please try again.')
+                  }
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+              >
+                {testEmailState === 'loading' ? (
+                  <><Loader2 size={14} className="animate-spin" /> Sending test email...</>
+                ) : (
+                  <><SendHorizonal size={14} /> Send Test Email</>
+                )}
+              </button>
+            </div>
+            {testEmailMsg && (
+              <p style={{
+                margin: '10px 0 0', fontSize: '12px', padding: '8px 12px', borderRadius: '6px',
+                background: testEmailState === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: testEmailState === 'success' ? '#4ade80' : '#f87171',
+                border: `1px solid ${testEmailState === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              }}>
+                {testEmailMsg}
+              </p>
+            )}
           </div>
         </div>
       )}
