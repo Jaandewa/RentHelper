@@ -55,10 +55,20 @@ export default function ForgotPasswordPage() {
         }),
       })
 
+      if (res.status === 429) {
+        setError('Please wait and try again later.')
+        return
+      }
+
+      if (res.status >= 500) {
+        setError('We could not process this request right now. Please try again.')
+        return
+      }
+
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.message || 'Something went wrong. Please try again.')
+        setError(data.message || 'We could not process this request right now. Please try again.')
         return
       }
 
@@ -73,7 +83,7 @@ export default function ForgotPasswordPage() {
         setNoOptions(true)
       }
     } catch {
-      setError('Network error. Please check your connection and try again.')
+      setError('We could not process this request right now. Please try again.')
     } finally {
       setIsLoading(false)
     }

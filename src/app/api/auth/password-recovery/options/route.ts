@@ -113,17 +113,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!user || !user.password) {
+    if (!user) {
       return NextResponse.json(GENERIC_RESPONSE)
     }
 
     const channels: Array<{ id: string; label: string }> = []
     const availableChannelIds: string[] = []
 
-    if (user.email && user.emailVerified) {
+    // Email channel: eligible if account has a registered email
+    // Registration stores email but does not set emailVerified (only OAuth does)
+    if (user.email) {
       channels.push({
         id: 'email',
-        label: maskEmailForDisplay(user.email)
+        label: 'Email: ' + maskEmailForDisplay(user.email)
       })
       availableChannelIds.push('email')
     }
@@ -134,7 +136,7 @@ export async function POST(req: NextRequest) {
     if (phone && phoneVerified) {
       channels.push({
         id: 'whatsapp',
-        label: maskPhoneForDisplay(phone)
+        label: 'WhatsApp: ' + maskPhoneForDisplay(phone)
       })
       availableChannelIds.push('whatsapp')
     }
