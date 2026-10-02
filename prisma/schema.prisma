@@ -162,6 +162,10 @@ model CustomerProfile {
   normalizedIdentityNumber   String?   // Uppercase, trimmed
   phone                      String?
   normalizedPhone            String?   @unique // E.164 digits-only
+  customerType               String?   // "LOCAL" or "FOREIGN"
+  nationality                String?   // ISO country code for foreign customers  
+  passportIssuingCountry     String?   // ISO country code
+  whatsappCountryCode        String?   // Country calling code e.g. "94", "44"
   phoneVerified              Boolean   @default(false)
   phoneVerifiedAt            DateTime?
   phone2                  String?

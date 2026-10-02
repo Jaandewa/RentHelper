@@ -16,6 +16,7 @@ import {
   maskPhone,
 } from '@/lib/otp'
 import { sendRegistrationOtpWhatsApp } from '@/lib/notifications/whatsapp'
+import { parsePhoneNumberFromString } from 'libphonenumber-js'
 
 const OTP_EXPIRY_MINUTES = 5
 const RESEND_COOLDOWN_SECONDS = 60
@@ -25,7 +26,7 @@ const MAX_SENDS_PER_SESSION_15MIN = 5
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { phoneNumber, sessionToken: clientSessionToken } = body
+    const { phoneNumber, countryCode, sessionToken: clientSessionToken } = body
 
     // ── Validate phone input ──────────────────────────────────────────
     if (!phoneNumber || typeof phoneNumber !== 'string') {
@@ -35,17 +36,28 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!isValidSriLankanPhoneInput(phoneNumber)) {
-      return NextResponse.json(
-        { success: false, error: 'Please enter a valid Sri Lankan phone number (e.g. 0771234567).' },
-        { status: 400 }
-      )
+    let normalized: string | undefined = undefined
+
+    if (countryCode && countryCode !== 'LK') {
+      const parsed = parsePhoneNumberFromString(phoneNumber, countryCode as any)
+      if (parsed?.isValid()) {
+        normalized = parsed.number.replace('+', '')
+      }
+    } else {
+      const parsed = parsePhoneNumberFromString(phoneNumber, 'LK')
+      if (parsed?.isValid()) {
+        normalized = parsed.number.replace('+', '')
+      }
+      
+      // Fallback to existing logic
+      if (!normalized && isValidSriLankanPhoneInput(phoneNumber)) {
+        normalized = normalizeSriLankanPhone(phoneNumber) || undefined
+      }
     }
 
-    const normalized = normalizeSriLankanPhone(phoneNumber)
     if (!normalized) {
       return NextResponse.json(
-        { success: false, error: 'Invalid phone number format.' },
+        { success: false, error: (!countryCode || countryCode === 'LK') ? 'Please enter a valid Sri Lankan phone number (e.g. 0771234567).' : 'Invalid phone number format for the selected country.' },
         { status: 400 }
       )
     }

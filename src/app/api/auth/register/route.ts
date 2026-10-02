@@ -2,12 +2,17 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { verifyVerificationToken, normalizeSriLankanPhone } from '@/lib/otp'
-import { normalizePhoneInternational } from '@/lib/phone'
+import { normalizePhoneInternational, normalizeIdentityNumber } from '@/lib/phone'
+import { parsePhoneNumberFromString } from 'libphonenumber-js'
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { name, email, password, role, whatsappNumber, registrationVerificationToken } = body
+    const { 
+      name, email, password, role, whatsappNumber, registrationVerificationToken,
+      customerType = 'LOCAL', whatsappCountryCode = '94', identityType: reqIdentityType,
+      identityNumber, nationality, passportIssuingCountry, address, countryCode
+    } = body
 
     if (!name || !email || !password || !role) {
       return NextResponse.json({ message: 'Missing fields' }, { status: 400 })
@@ -39,7 +44,22 @@ export async function POST(req: Request) {
       }
 
       // Normalize submitted phone and verify it matches the token
-      const normalizedSubmitted = normalizeSriLankanPhone(whatsappNumber)
+      let normalizedSubmitted: string | undefined = undefined
+      if (countryCode && countryCode !== 'LK') {
+        const parsed = parsePhoneNumberFromString(whatsappNumber, countryCode as any)
+        if (parsed?.isValid()) {
+          normalizedSubmitted = parsed.number.replace('+', '')
+        }
+      } else {
+        const parsed = parsePhoneNumberFromString(whatsappNumber, 'LK')
+        if (parsed?.isValid()) {
+          normalizedSubmitted = parsed.number.replace('+', '')
+        }
+        if (!normalizedSubmitted) {
+          normalizedSubmitted = normalizeSriLankanPhone(whatsappNumber) || undefined
+        }
+      }
+
       if (!normalizedSubmitted || normalizedSubmitted !== tokenPayload.phone) {
         return NextResponse.json(
           { message: 'WhatsApp number does not match the verified number. Please verify again.' },
@@ -93,6 +113,34 @@ export async function POST(req: Request) {
       }
     }
 
+    let finalIdentityType = reqIdentityType
+    let normalizedIdentityNumber: string | undefined = undefined
+
+    if (role === 'customer') {
+      if (customerType === 'FOREIGN' && identityNumber) {
+        finalIdentityType = 'PASSPORT'
+        if (!nationality || !passportIssuingCountry) {
+          return NextResponse.json({ message: 'Nationality and Passport Issuing Country are required for foreign customers.' }, { status: 400 })
+        }
+      } else if (customerType === 'LOCAL' && identityNumber) {
+        const nicRegex = /^([0-9]{9}[vVxX]|[0-9]{12})$/
+        if (!nicRegex.test(identityNumber)) {
+          return NextResponse.json({ message: 'Invalid NIC format.' }, { status: 400 })
+        }
+        finalIdentityType = 'NIC'
+      }
+
+      if (identityNumber) {
+        normalizedIdentityNumber = normalizeIdentityNumber(identityNumber)
+        const existingId = await prisma.customerProfile.findFirst({
+          where: { identityType: finalIdentityType, normalizedIdentityNumber }
+        })
+        if (existingId) {
+          return NextResponse.json({ message: 'This identity number is already registered.' }, { status: 409 })
+        }
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 12)
 
     const user = await prisma.user.create({
@@ -107,6 +155,13 @@ export async function POST(req: Request) {
           normalizedPhone,
           phoneVerified: true,
           phoneVerifiedAt: new Date(),
+          customerType,
+          whatsappCountryCode,
+          nationality: customerType === 'FOREIGN' ? nationality : null,
+          passportIssuingCountry: customerType === 'FOREIGN' ? passportIssuingCountry : null,
+          address,
+          identityType: identityNumber ? finalIdentityType : undefined,
+          normalizedIdentityNumber: identityNumber ? normalizedIdentityNumber : undefined,
         },
       })
     }
