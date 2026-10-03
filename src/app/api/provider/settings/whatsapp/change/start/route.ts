@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     // Require current password for every change start request
     if (!currentPassword || typeof currentPassword !== 'string') {
       return NextResponse.json(
-        { ok: false, error: 'Current password is required to request a phone number change.' },
+        { ok: false, error: 'We could not verify your current password. Please try again.' },
         { status: 400 }
       )
     }
@@ -46,13 +46,16 @@ export async function POST(req: NextRequest) {
     })
 
     if (!user || !user.password) {
-      return NextResponse.json({ ok: false, error: 'User credentials error.' }, { status: 400 })
+      return NextResponse.json(
+        { ok: false, error: 'We could not verify your current password. Please try again.' },
+        { status: 400 }
+      )
     }
 
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password)
     if (!isPasswordValid) {
       return NextResponse.json(
-        { ok: false, error: 'Incorrect password. Please enter your current password to continue.' },
+        { ok: false, error: 'We could not verify your current password. Please try again.' },
         { status: 400 }
       )
     }
