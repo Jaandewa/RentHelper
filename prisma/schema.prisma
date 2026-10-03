@@ -661,11 +661,20 @@ model NotificationDelivery {
   eventType        String?   // KYC_DECISION, NEW_BOOKING_REQUEST, PROVIDER_DECISION, REGISTRATION_OTP, PAYMENT_CONFIRMATION, HANDOVER_THANKS
   recipient        String    // phone number or email
   recipientUserId  String?   // user ID for cross-referencing
+  recipientType    String?   // CUSTOMER, PROVIDER, ADMIN
   channel          String    // whatsapp, email, sms, in_app
-  status           String    // sent, failed, not_configured, pending
+  status           String    // pending, sending, sent, delivered, read, failed, skipped
   error            String?
   relatedEntityId  String?   // bookingId, kycId, paymentId
+  entityType       String?   // BOOKING, PAYMENT, KYC, SETTLEMENT
   metadata         Json?     // template variables for future WhatsApp templates
+  idempotencyKey   String?   @unique  // {event}:{entityId}:{userId}:{channel}
+  providerMessageId String?  // External message ID from WhatsApp/email provider
+  templateKey      String?   // WhatsApp template eventType or email template key
+  attemptCount     Int       @default(0)
+  maxAttempts      Int       @default(3)
+  nextAttemptAt    DateTime?
+  lastErrorCode    String?
   sentAt           DateTime?
   deliveredAt      DateTime?
   readAt           DateTime?
@@ -675,6 +684,7 @@ model NotificationDelivery {
   @@index([eventType])
   @@index([recipientUserId])
   @@index([relatedEntityId])
+  @@index([status, nextAttemptAt])
   @@map("notification_deliveries")
 }
 

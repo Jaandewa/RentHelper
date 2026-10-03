@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/admin-guard'
-import { sendKycDecisionNotification } from '@/lib/notifications/service'
+import { sendKycDecisionNotification, queueEventNotifications } from '@/lib/notifications/service'
 import { VALID_REASON_CODES, getReasonByCode, buildFinalReason } from '@/lib/kyc-rejection-reasons'
 
 const MAX_NOTE_LENGTH = 500
@@ -73,6 +73,24 @@ export async function POST(req: NextRequest) {
     sendKycDecisionNotification(customerId, 'rejected', finalReason).catch(e =>
       console.error('[Notification] KYC rejection notification error:', e)
     )
+
+    queueEventNotifications({
+      eventType: 'KYC_REJECTED',
+      entityType: 'KYC',
+      entityId: customerId,
+      recipients: [{
+        userId: customerId,
+        type: 'CUSTOMER',
+        phone: (customer as any).phone || null,
+        email: customer.user?.email || null,
+        name: customer.user?.name || 'Customer'
+      }],
+      metadata: {
+        customerName: customer.user?.name || 'Customer',
+        kycStatus: 'rejected',
+        rejectionReason: finalReason
+      }
+    }).catch(() => {})
 
     return NextResponse.json({ success: true, message: 'Customer KYC rejected successfully' })
   } catch (err: any) {

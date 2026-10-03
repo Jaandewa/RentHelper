@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-import { sendDepositRefundedWhatsApp, sendDepositDeductionWhatsApp } from '@/lib/notifications/whatsapp'
+import { queueEventNotifications } from '@/lib/notifications/service'
 // Assuming this module exists as per prompt instructions
 import { VALID_DEDUCTION_CODES } from '@/lib/deposit-deduction-reasons'
 
@@ -151,38 +151,71 @@ export async function POST(req: Request, { params }: { params: Promise<{ booking
       })
     })
 
-    // Send WhatsApp
-    try {
-      if (booking.customer.phone) {
-        const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
-        if (deductionAmount === 0) {
-          await sendDepositRefundedWhatsApp(booking.customer.phone, {
-            customerName: booking.customer.user?.name || 'Customer',
-            bookingId: booking.bookingNumber,
-            itemName,
-            providerName: booking.business.name,
-            securityDeposit: booking.depositAmount.toString(),
-            refundAmount: refundAmount.toString(),
-            refundMethod: settlementMethod,
-            refundReference: refundReference || 'N/A'
-          })
-        } else {
-          await sendDepositDeductionWhatsApp(booking.customer.phone, {
-            customerName: booking.customer.user?.name || 'Customer',
-            bookingId: booking.bookingNumber,
-            itemName,
-            providerName: booking.business.name,
-            securityDeposit: booking.depositAmount.toString(),
-            deductionAmount: deductionAmount.toString(),
-            deductionReason: deductionReasonText || deductionReasonCode,
-            refundAmount: refundAmount.toString(),
-            settlementStatus: settlementStatus
-          })
-        }
+    // Queue Event Notifications
+    const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
+    
+    // 1. Notification for deposit
+    queueEventNotifications({
+      eventType: deductionAmount === 0 ? 'DEPOSIT_REFUNDED' : 'DEPOSIT_DEDUCTION_APPLIED',
+      entityType: 'BOOKING',
+      entityId: bookingId,
+      recipients: [{
+        userId: booking.customerId,
+        type: 'CUSTOMER',
+        phone: booking.customer.phone || null,
+        email: booking.customer.user?.email || null,
+        name: booking.customer.user?.name || 'Customer'
+      }],
+      metadata: {
+        bookingId: booking.bookingNumber || booking.id,
+        itemName,
+        providerName: booking.business.name,
+        depositAmount: String(booking.depositAmount),
+        refundAmount: String(refundAmount),
+        deductionAmount: String(deductionAmount),
+        deductionReason: deductionReasonText || deductionReasonCode || '',
+        settlementMethod: settlementMethod || '',
+        settlementStatus: settlementStatus
       }
-    } catch (e) {
-      console.error('WhatsApp send error:', e)
-    }
+    }).catch(() => {})
+
+    // 2. Notification for RETURN_COMPLETED (Customer)
+    queueEventNotifications({
+      eventType: 'RETURN_COMPLETED',
+      entityType: 'BOOKING',
+      entityId: bookingId,
+      recipients: [{
+        userId: booking.customerId,
+        type: 'CUSTOMER',
+        phone: booking.customer.phone || null,
+        email: booking.customer.user?.email || null,
+        name: booking.customer.user?.name || 'Customer'
+      }],
+      metadata: {
+        bookingId: booking.bookingNumber || booking.id,
+        itemName,
+        providerName: booking.business.name
+      }
+    }).catch(() => {})
+
+    // 3. Notification for RETURN_COMPLETED (Provider)
+    queueEventNotifications({
+      eventType: 'RETURN_COMPLETED',
+      entityType: 'BOOKING',
+      entityId: bookingId,
+      recipients: [{
+        userId: booking.business.userId,
+        type: 'PROVIDER',
+        phone: booking.business.phone || null,
+        email: null,
+        name: booking.business.name
+      }],
+      metadata: {
+        bookingId: booking.bookingNumber || booking.id,
+        itemName,
+        customerName: booking.customer.user?.name || 'Customer'
+      }
+    }).catch(() => {})
 
     return NextResponse.json({ success: true })
   } catch (error) {

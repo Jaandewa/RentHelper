@@ -422,3 +422,112 @@ export async function sendHandoverThanksNotification(
     console.error('[Notification Service] sendHandoverThanksNotification error:', e)
   }
 }
+
+// ── Outbox Queue Functions ───────────────────────────────────────────────
+
+export interface NotificationRecipient {
+  userId?: string
+  type: 'CUSTOMER' | 'PROVIDER' | 'ADMIN'
+  phone?: string | null
+  email?: string | null
+  name?: string
+}
+
+export interface QueueNotificationParams {
+  eventType: string
+  channel: 'whatsapp' | 'email'
+  recipientUserId?: string
+  recipientType: 'CUSTOMER' | 'PROVIDER' | 'ADMIN'
+  recipient: string
+  entityType: string
+  entityId: string
+  templateKey?: string
+  metadata?: Record<string, any>
+}
+
+export interface QueueEventParams {
+  eventType: string
+  entityType: string
+  entityId: string
+  recipients: NotificationRecipient[]
+  metadata: Record<string, any>
+  templateKey?: string
+}
+
+/**
+ * Queue a single notification for async dispatch.
+ * Uses idempotency key to prevent duplicates.
+ */
+export async function queueNotification(params: QueueNotificationParams): Promise<void> {
+  const {
+    eventType, channel, recipientUserId, recipientType,
+    recipient, entityType, entityId, templateKey, metadata,
+  } = params
+
+  const idempotencyKey = `${eventType}:${entityId}:${recipientUserId || recipient}:${channel}`
+
+  try {
+    await prisma.notificationDelivery.upsert({
+      where: { idempotencyKey },
+      update: {},
+      create: {
+        type: channel === 'whatsapp' ? 'whatsapp_text' : 'email',
+        eventType,
+        channel,
+        recipient,
+        recipientUserId: recipientUserId || null,
+        recipientType,
+        entityType,
+        relatedEntityId: entityId,
+        templateKey: templateKey || eventType,
+        metadata: metadata || undefined,
+        idempotencyKey,
+        status: 'pending',
+        nextAttemptAt: new Date(),
+        attemptCount: 0,
+      },
+    })
+  } catch (error: any) {
+    if (error?.code === 'P2002') return
+    console.error(`[NotificationQueue] Failed to queue ${eventType}/${channel}:`, error?.message)
+  }
+}
+
+/**
+ * Queue notifications for all recipients across all channels.
+ * Skips channels where the recipient has no contact info.
+ */
+export async function queueEventNotifications(params: QueueEventParams): Promise<void> {
+  const { eventType, entityType, entityId, recipients, metadata, templateKey } = params
+
+  const promises: Promise<void>[] = []
+
+  for (const recipient of recipients) {
+    if (recipient.phone) {
+      promises.push(
+        queueNotification({
+          eventType, channel: 'whatsapp',
+          recipientUserId: recipient.userId,
+          recipientType: recipient.type,
+          recipient: recipient.phone,
+          entityType, entityId, templateKey,
+          metadata: { ...metadata, recipientName: recipient.name || undefined },
+        })
+      )
+    }
+    if (recipient.email) {
+      promises.push(
+        queueNotification({
+          eventType, channel: 'email',
+          recipientUserId: recipient.userId,
+          recipientType: recipient.type,
+          recipient: recipient.email,
+          entityType, entityId, templateKey,
+          metadata: { ...metadata, recipientName: recipient.name || undefined },
+        })
+      )
+    }
+  }
+
+  await Promise.allSettled(promises)
+}

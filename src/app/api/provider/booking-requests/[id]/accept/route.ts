@@ -2,8 +2,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { checkItemAvailability } from '@/lib/booking/availability'
-import { sendBookingAcceptedWhatsApp } from '@/lib/notifications/whatsapp'
-import { sendProviderDecisionNotification } from '@/lib/notifications/service'
+import { sendProviderDecisionNotification, queueEventNotifications } from '@/lib/notifications/service'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -79,25 +78,33 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       console.error('[Notification] Provider accept notification error:', e)
     )
 
-    // Direct WhatsApp (existing behavior preserved)
-    try {
-      const customerPhone = booking.customer.phone
-      if (customerPhone) {
-        const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
-        const pickupDT = `${booking.pickupDate.toLocaleDateString()} ${booking.pickupTime || ''}`.trim()
-        const returnDT = `${booking.returnDate.toLocaleDateString()} ${booking.returnTime || ''}`.trim()
+    // Queue WhatsApp + email notifications for customer
+    const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
+    const pickupDT = `${booking.pickupDate.toLocaleDateString()} ${booking.pickupTime || ''}`.trim()
+    const returnDT = `${booking.returnDate.toLocaleDateString()} ${booking.returnTime || ''}`.trim()
 
-        await sendBookingAcceptedWhatsApp(customerPhone, {
-          itemName,
-          providerName: booking.business.name,
-          pickupDateTime: pickupDT,
-          returnDateTime: returnDT,
-          advanceRequired: booking.advanceAmount,
-        })
-      }
-    } catch (e) {
-      console.error('WhatsApp notification failed:', e)
-    }
+    queueEventNotifications({
+      eventType: 'BOOKING_ACCEPTED',
+      entityType: 'BOOKING',
+      entityId: id,
+      recipients: [{
+        userId: booking.customer?.userId,
+        type: 'CUSTOMER',
+        phone: booking.customer?.phone || undefined,
+        email: booking.customer?.user?.email || undefined,
+        name: booking.customer?.user?.name || 'Customer',
+      }],
+      metadata: {
+        customerName: booking.customer?.user?.name || 'Customer',
+        bookingId: booking.bookingNumber,
+        itemName,
+        providerName: booking.business.name,
+        pickupDateTime: pickupDT,
+        returnDateTime: returnDT,
+        advanceRequired: String(booking.advanceAmount),
+        paymentDeadline: holdExpiresAt.toISOString(),
+      },
+    }).catch(() => {})
 
     return NextResponse.json({
       success: true,

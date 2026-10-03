@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendPaymentConfirmationNotification } from '@/lib/notifications/service'
+import { sendPaymentConfirmationNotification, queueEventNotifications } from '@/lib/notifications/service'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   // 1. Authenticate customer
@@ -80,35 +80,50 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     console.error('[Notification] Payment confirmation notification error:', e)
   )
 
-  // 10. Send WhatsApp to both parties (existing behavior preserved)
-  try {
-    const customerPhone = booking.customer.phone
-    if (customerPhone) {
-      const { sendBookingConfirmedWhatsApp } = await import('@/lib/notifications/whatsapp')
-      await sendBookingConfirmedWhatsApp(customerPhone, {
-        itemName: booking.bookingItems[0]?.item?.name || 'Rental item',
-        providerName: booking.business.name,
-        pickupDateTime: `${booking.pickupDate.toLocaleDateString()} ${booking.pickupTime || ''}`.trim(),
-        returnDateTime: `${booking.returnDate.toLocaleDateString()} ${booking.returnTime || ''}`.trim(),
-        advancePaid: booking.advanceAmount,
-        balanceDue: booking.totalAmount - booking.advanceAmount,
-        deposit: booking.depositAmount,
-      })
+  // 10. Queue Event Notifications
+  queueEventNotifications({
+    eventType: 'PAYMENT_CONFIRMED',
+    entityType: 'BOOKING',
+    entityId: id,
+    recipients: [{
+      userId: booking.customerId,
+      type: 'CUSTOMER',
+      phone: booking.customer.phone || null,
+      email: booking.customer.user?.email || null,
+      name: booking.customer.user?.name || 'Customer'
+    }],
+    metadata: {
+      bookingId: booking.id,
+      itemName: booking.bookingItems[0]?.item?.name || 'Rental item',
+      providerName: booking.business.name,
+      amountPaid: String(booking.advanceAmount),
+      advancePaid: String(booking.advanceAmount),
+      remainingBalance: String(booking.totalAmount - booking.advanceAmount),
+      paymentDate: new Date().toISOString()
     }
-  } catch (e) { console.error('WhatsApp notification failed:', e) }
+  }).catch(() => {})
 
-  try {
-    if (booking.business.phone) {
-      const { sendBookingConfirmedProviderWhatsApp } = await import('@/lib/notifications/whatsapp')
-      await sendBookingConfirmedProviderWhatsApp(booking.business.phone, {
-        customerName: booking.customer.user.name || 'Customer',
-        itemName: booking.bookingItems[0]?.item?.name || 'Rental item',
-        pickupDateTime: `${booking.pickupDate.toLocaleDateString()} ${booking.pickupTime || ''}`.trim(),
-        returnDateTime: `${booking.returnDate.toLocaleDateString()} ${booking.returnTime || ''}`.trim(),
-        advancePaid: booking.advanceAmount,
-      })
+  queueEventNotifications({
+    eventType: 'BOOKING_CONFIRMED_PROVIDER',
+    entityType: 'BOOKING',
+    entityId: id,
+    recipients: [{
+      userId: booking.business.userId,
+      type: 'PROVIDER',
+      phone: booking.business.phone || null,
+      email: null,
+      name: booking.business.name
+    }],
+    metadata: {
+      bookingId: booking.id,
+      itemName: booking.bookingItems[0]?.item?.name || 'Rental item',
+      customerName: booking.customer.user?.name || 'Customer',
+      amountPaid: String(booking.advanceAmount),
+      advancePaid: String(booking.advanceAmount),
+      remainingBalance: String(booking.totalAmount - booking.advanceAmount),
+      paymentDate: new Date().toISOString()
     }
-  } catch (e) { console.error('WhatsApp notification failed:', e) }
+  }).catch(() => {})
 
   return NextResponse.json({ success: true, booking: updated, payment })
 }

@@ -1,8 +1,7 @@
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
-import { sendBookingRejectedWhatsApp } from '@/lib/notifications/whatsapp'
-import { sendProviderDecisionNotification } from '@/lib/notifications/service'
+import { sendProviderDecisionNotification, queueEventNotifications } from '@/lib/notifications/service'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -63,21 +62,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       console.error('[Notification] Provider reject notification error:', e)
     )
 
-    // Direct WhatsApp (existing behavior preserved)
-    try {
-      const customerPhone = booking.customer.phone
-      if (customerPhone) {
-        const itemName = booking.bookingItems[0]?.item?.name || 'Rental item'
-
-        await sendBookingRejectedWhatsApp(customerPhone, {
-          itemName,
-          providerName: booking.business.name,
-          reason,
-        })
+    // Queue event notification
+    queueEventNotifications({
+      eventType: 'BOOKING_REJECTED',
+      entityType: 'BOOKING',
+      entityId: id,
+      recipients: [{
+        userId: booking.customerId,
+        type: 'CUSTOMER',
+        phone: booking.customer.phone || null,
+        email: booking.customer.user?.email || null,
+        name: booking.customer.user?.name || 'Customer'
+      }],
+      metadata: {
+        customerName: booking.customer.user?.name || 'Customer',
+        bookingId: id,
+        itemName: booking.bookingItems[0]?.item?.name || 'Rental item',
+        providerName: booking.business.name,
+        rejectionReason: reason
       }
-    } catch (e) {
-      console.error('WhatsApp notification failed:', e)
-    }
+    }).catch(() => {})
 
     return NextResponse.json({ success: true, booking: updated })
   } catch (error) {

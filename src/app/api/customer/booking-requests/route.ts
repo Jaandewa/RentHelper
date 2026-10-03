@@ -5,7 +5,7 @@ import { checkItemAvailability } from '@/lib/booking/availability'
 import { calculateBookingPricing, validateBookingDates, combineDateAndTime } from '@/lib/booking/pricing'
 import { generateBookingNumber } from '@/lib/utils'
 import { sendBookingRequestWhatsApp } from '@/lib/notifications/whatsapp'
-import { sendNewBookingRequestNotification } from '@/lib/notifications/service'
+import { sendNewBookingRequestNotification, queueEventNotifications } from '@/lib/notifications/service'
 
 export async function POST(req: Request) {
   try {
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
     const ad = await prisma.rentalAd.findUnique({
       where: { id: adId },
-      include: { item: true, business: true }
+      include: { item: true, business: { include: { user: { select: { email: true } } } } }
     })
 
     if (!ad || !ad.isPublished || !ad.isAvailable) {
@@ -146,24 +146,29 @@ export async function POST(req: Request) {
       console.error('[Notification] New booking request notification error:', e)
     )
 
-    // Direct WhatsApp to provider (existing behavior preserved)
-    try {
-      if (ad.business.phone) {
-        await sendBookingRequestWhatsApp(ad.business.phone, {
-          requestNumber: bookingNumber,
-          customerName: customerProfile.user?.name || 'Customer',
-          itemName: ad.item.name,
-          pickupDateTime: `${pickupDate} ${pickupTime || ''}`.trim(),
-          returnDateTime: `${returnDate} ${returnTime || ''}`.trim(),
-          purpose: purpose || 'General rental',
-          rentalTotal: pricing.totalPayable,
-          deposit: pricing.securityDeposit,
-          advanceRequired: pricing.advanceRequired,
-        })
-      }
-    } catch (e) {
-      console.error('WhatsApp notification failed:', e)
-    }
+    // Queue WhatsApp + email notifications for provider (async dispatch)
+    queueEventNotifications({
+      eventType: 'NEW_BOOKING_REQUEST',
+      entityType: 'BOOKING',
+      entityId: booking.id,
+      recipients: [{
+        userId: ad.business.userId,
+        type: 'PROVIDER',
+        phone: ad.business.phone || undefined,
+        email: ad.business.user?.email || undefined,
+        name: ad.business.name,
+      }],
+      metadata: {
+        bookingId: bookingNumber,
+        customerName: customerProfile.user?.name || 'Customer',
+        itemName: ad.item.name,
+        pickupDateTime: `${pickupDate} ${pickupTime || ''}`.trim(),
+        returnDateTime: `${returnDate} ${returnTime || ''}`.trim(),
+        rentalTotal: String(pricing.totalPayable),
+        advanceRequired: String(pricing.advanceRequired),
+        customerPurpose: purpose || 'General rental',
+      },
+    }).catch(() => {})
 
     return NextResponse.json({ success: true, booking }, { status: 201 })
   } catch (error) {

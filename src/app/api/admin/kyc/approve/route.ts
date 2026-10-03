@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/admin-guard'
-import { sendKycDecisionNotification } from '@/lib/notifications/service'
+import { sendKycDecisionNotification, queueEventNotifications } from '@/lib/notifications/service'
 
 export async function POST(req: NextRequest) {
   const { error, session } = await requireAdmin()
@@ -48,6 +48,23 @@ export async function POST(req: NextRequest) {
     sendKycDecisionNotification(customerId, 'approved').catch(e =>
       console.error('[Notification] KYC approval notification error:', e)
     )
+
+    queueEventNotifications({
+      eventType: 'KYC_APPROVED',
+      entityType: 'KYC',
+      entityId: customerId,
+      recipients: [{
+        userId: customerId,
+        type: 'CUSTOMER',
+        phone: (customer as any).phone || null,
+        email: customer.user?.email || null,
+        name: customer.user?.name || 'Customer'
+      }],
+      metadata: {
+        customerName: customer.user?.name || 'Customer',
+        kycStatus: 'verified'
+      }
+    }).catch(() => {})
 
     return NextResponse.json({ success: true, message: 'Customer KYC approved successfully' })
   } catch (err: any) {
