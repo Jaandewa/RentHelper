@@ -170,7 +170,20 @@ export function renderEmailTemplate(eventType: string, vars: Record<string, any>
         text: `Hi ${vars.customerName},\n\nWe have processed the security deposit for your recent rental.\nDeduction: Rs. ${vars.deductionAmount}\nReason: ${vars.deductionReason}\nRefunded Amount: Rs. ${vars.refundAmount}`
       };
 
+    case 'PROVIDER_WHATSAPP_CHANGED':
+      return {
+        subject: 'Security Alert: Your Provider WhatsApp Contact Number Was Changed',
+        html: getTemplateWrapper(
+          'WhatsApp Contact Number Changed',
+          `<p>Hi ${vars.providerName || 'Provider'},</p><p>Your RentHelper provider WhatsApp contact number was updated to <strong>${vars.maskedPhone || 'your new number'}</strong>.</p><p style="padding: 15px; background-color: #fef3c7; color: #92400e; border-radius: 6px;">If you did not perform this action, please contact support immediately to secure your account.</p>`,
+          `${BASE_URL}/dashboard/settings`,
+          'Manage Business Settings'
+        ),
+        text: `Hi ${vars.providerName || 'Provider'},\n\nYour RentHelper provider WhatsApp contact number was updated to ${vars.maskedPhone || 'your new number'}.\n\nIf you did not perform this action, please contact support immediately.\n\nManage Settings: ${BASE_URL}/dashboard/settings`
+      };
+
     default:
       return null;
   }
 }
+

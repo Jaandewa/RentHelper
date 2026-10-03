@@ -19,6 +19,12 @@ export async function GET() {
   }
 
   return NextResponse.json({
+    id: business.id,
+    name: business.name,
+    phone: business.phone,
+    normalizedPhone: business.normalizedPhone,
+    phoneVerified: business.phoneVerified,
+    phoneVerifiedAt: business.phoneVerifiedAt,
     approvalStatus: business.approvalStatus,
     subscription: business.subscription,
   })
