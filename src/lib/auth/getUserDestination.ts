@@ -22,7 +22,12 @@ export async function getUserDestination(userId: string): Promise<string> {
   }
 
   if (role === 'PROVIDER') {
-    return user.businessProfile ? '/dashboard' : '/onboarding/business'
+    if (!user.businessProfile) return '/onboarding/business'
+    if (!user.businessProfile.phoneVerified) return '/provider/verify-whatsapp'
+    const approval = user.businessProfile.approvalStatus?.toLowerCase()
+    if (approval === 'rejected') return '/provider/rejected'
+    if (approval === 'suspended') return '/provider/suspended'
+    return '/dashboard'
   }
 
   if (role === 'CUSTOMER') {

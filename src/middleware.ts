@@ -9,7 +9,7 @@ export default middleware((req) => {
 
   const protectedRoutes = [
     '/dashboard', '/onboarding', '/admin', '/inventory', '/bookings',
-    '/customers', '/calendar', '/invoices', '/settings', '/customer'
+    '/customers', '/calendar', '/invoices', '/settings', '/customer', '/provider'
   ]
 
   const isProtected = protectedRoutes.some(route => pathname.startsWith(route))
@@ -79,6 +79,14 @@ export default middleware((req) => {
   if (role === 'provider') {
     if (pathname.startsWith('/customer/')) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+
+    // Block unverified providers from dashboard (allow verify page + onboarding)
+    const phoneVerified = (session.user as any)?.phoneVerified
+    if (!phoneVerified && !pathname.startsWith('/provider/verify-whatsapp') && !pathname.startsWith('/onboarding')) {
+      if (pathname.startsWith('/dashboard') || pathname.startsWith('/inventory') || pathname.startsWith('/bookings') || pathname.startsWith('/settings')) {
+        return NextResponse.redirect(new URL('/provider/verify-whatsapp', req.url))
+      }
     }
   }
 

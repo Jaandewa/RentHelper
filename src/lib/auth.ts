@@ -57,11 +57,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token.id) {
         const isSignInOrSignUp = trigger === 'signIn' || trigger === 'signUp'
         const isCustomer = token.role === 'customer'
+        const isProvider = token.role === 'provider'
         const now = Date.now()
         const lastRefresh = (token.kycRefreshedAt as number) || 0
         const stale = now - lastRefresh > 5 * 60 * 1000 // 5 minutes
 
-        if (isSignInOrSignUp || (isCustomer && stale)) {
+        if (isSignInOrSignUp || (isCustomer && stale) || (isProvider && stale)) {
           try {
             const dbUser = await prisma.user.findUnique({
               where: { id: token.id as string },
@@ -77,6 +78,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               }
               token.role = dbUser.role
               token.businessCompleted = Boolean(dbUser.businessProfile)
+              token.phoneVerified = dbUser.businessProfile?.phoneVerified ?? false
               token.kycStatus = dbUser.customerProfile?.kycStatus || 'not_submitted'
               token.accountStatus = dbUser.customerProfile?.accountStatus || 'incomplete'
               token.kycRefreshedAt = now
@@ -93,6 +95,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.kycStatus = token.kycStatus || null
         session.user.accountStatus = token.accountStatus || null
         session.user.businessCompleted = Boolean(token.businessCompleted)
+        session.user.phoneVerified = Boolean(token.phoneVerified)
       }
       return session
     },
