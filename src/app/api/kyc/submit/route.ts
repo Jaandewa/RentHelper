@@ -122,6 +122,12 @@ export async function POST(req: Request) {
       where: { customerId: customer.id }
     })
 
+    // Helper to ensure opaque storage key is stored, not a public URL
+    const toStorageKey = (val?: string) => {
+      if (!val) return ''
+      return val.includes('/') ? val.split('/').pop()! : val
+    }
+
     // Save uploaded documents
     const docs: { customerId: string; type: string; url: string; fileName: string }[] = []
 
@@ -129,7 +135,7 @@ export async function POST(req: Request) {
       docs.push({
         customerId: customer.id,
         type: 'nic_front',
-        url: nicFrontUrl,
+        url: toStorageKey(nicFrontUrl),
         fileName: nicFrontName || 'nic_front.jpg',
       })
     }
@@ -138,7 +144,7 @@ export async function POST(req: Request) {
       docs.push({
         customerId: customer.id,
         type: 'nic_back',
-        url: nicBackUrl,
+        url: toStorageKey(nicBackUrl),
         fileName: nicBackName || 'nic_back.jpg',
       })
     }
@@ -147,7 +153,7 @@ export async function POST(req: Request) {
       docs.push({
         customerId: customer.id,
         type: 'selfie_with_id',
-        url: selfieUrl,
+        url: toStorageKey(selfieUrl),
         fileName: selfieName || 'selfie.jpg',
       })
     }

@@ -287,8 +287,8 @@ export default function KycDetailReviewPage({ params }: { params: Promise<{ id: 
             <p className="font-semibold text-sm text-gray-800 mb-2">ID Front Photo</p>
             {frontDoc ? (
               <div className="space-y-2">
-                <a href={frontDoc.url} target="_blank" rel="noopener noreferrer" className="block group relative overflow-hidden rounded-lg border border-gray-300 bg-white">
-                  <img src={frontDoc.url} alt="ID Front" className="w-full h-48 object-cover group-hover:scale-105 transition duration-200" />
+                <a href={`/api/admin/kyc/document/${frontDoc.id}`} target="_blank" rel="noopener noreferrer" className="block group relative overflow-hidden rounded-lg border border-gray-300 bg-white">
+                  <img src={`/api/admin/kyc/document/${frontDoc.id}`} alt="ID Front" className="w-full h-48 object-cover group-hover:scale-105 transition duration-200" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-medium transition">
                     <ExternalLink className="w-4 h-4 mr-1" /> View Full Image
                   </div>
@@ -307,8 +307,8 @@ export default function KycDetailReviewPage({ params }: { params: Promise<{ id: 
             <p className="font-semibold text-sm text-gray-800 mb-2">ID Back Photo</p>
             {backDoc ? (
               <div className="space-y-2">
-                <a href={backDoc.url} target="_blank" rel="noopener noreferrer" className="block group relative overflow-hidden rounded-lg border border-gray-300 bg-white">
-                  <img src={backDoc.url} alt="ID Back" className="w-full h-48 object-cover group-hover:scale-105 transition duration-200" />
+                <a href={`/api/admin/kyc/document/${backDoc.id}`} target="_blank" rel="noopener noreferrer" className="block group relative overflow-hidden rounded-lg border border-gray-300 bg-white">
+                  <img src={`/api/admin/kyc/document/${backDoc.id}`} alt="ID Back" className="w-full h-48 object-cover group-hover:scale-105 transition duration-200" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-medium transition">
                     <ExternalLink className="w-4 h-4 mr-1" /> View Full Image
                   </div>
@@ -327,8 +327,8 @@ export default function KycDetailReviewPage({ params }: { params: Promise<{ id: 
             <p className="font-semibold text-sm text-gray-800 mb-2">Selfie Photo <span className="text-gray-400 text-xs">(Optional)</span></p>
             {selfieDoc ? (
               <div className="space-y-2">
-                <a href={selfieDoc.url} target="_blank" rel="noopener noreferrer" className="block group relative overflow-hidden rounded-lg border border-gray-300 bg-white">
-                  <img src={selfieDoc.url} alt="Selfie Proof" className="w-full h-48 object-cover group-hover:scale-105 transition duration-200" />
+                <a href={`/api/admin/kyc/document/${selfieDoc.id}`} target="_blank" rel="noopener noreferrer" className="block group relative overflow-hidden rounded-lg border border-gray-300 bg-white">
+                  <img src={`/api/admin/kyc/document/${selfieDoc.id}`} alt="Selfie Proof" className="w-full h-48 object-cover group-hover:scale-105 transition duration-200" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-medium transition">
                     <ExternalLink className="w-4 h-4 mr-1" /> View Full Image
                   </div>

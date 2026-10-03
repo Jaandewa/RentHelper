@@ -153,7 +153,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                   <p style={{ margin: 0, fontSize: '13px', color: '#cbd5e1', textTransform: 'capitalize' }}>{doc.type.replace(/_/g, ' ')}</p>
                   <p style={{ margin: 0, fontSize: '11px', color: '#475569' }}>{fmt(doc.uploadedAt)}</p>
                 </div>
-                <a href={doc.url} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--ghost admin-btn--sm">View</a>
+                <a href={`/api/admin/kyc/document/${doc.id}`} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--ghost admin-btn--sm">View</a>
               </div>
             ))
           )}

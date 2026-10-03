@@ -1,79 +1,287 @@
 <?php
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
-header('Content-Type: application/json');
+// Production PHP Upload & Private Document Storage Engine for uploads.healingcity.lk
+// Protocol: Authenticated Server-to-Server Private Storage API v2.0
+
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, X-Storage-Api-Key");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+// ── SECRET HEADER VERIFICATION ─────────────────────────────────────────────
+$storageApiKey = getenv('STORAGE_SERVER_API_KEY') ?: 'CHANGE_ME_STORAGE_SECRET_2026';
+$providedKey = $_SERVER['HTTP_X_STORAGE_API_KEY'] ?? ($_GET['api_key'] ?? '');
+
+if (empty($providedKey) || !hash_equals($storageApiKey, $providedKey)) {
+    http_response_code(401);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Unauthorized request']);
     exit();
 }
 
-$uploadDir = __DIR__ . '/uploads/';
-if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0755, true);
-}
-
-// Support both 'images[]' and 'images' field names
-$files = [];
-if (isset($_FILES['images'])) {
-    $files = $_FILES['images'];
-} elseif (isset($_FILES['images[]'])) {
-    $files = $_FILES['images[]'];
-}
-
-if (empty($files) || empty($files['name'][0])) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'No files uploaded']);
-    exit();
-}
-
-$uploadedFiles = [];
-$errors = [];
-
-// Convert $_FILES array format to a more manageable structure
-$fileCount = count($files['name']);
-for ($i = 0; $i < $fileCount; $i++) {
-    $fileName = basename($files['name'][$i]);
-    $tmpName = $files['tmp_name'][$i];
-    $error = $files['error'][$i];
-    $size = $files['size'][$i];
-    
-    if ($error === UPLOAD_ERR_OK) {
-        $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        $allowedExts = ['jpg', 'jpeg', 'png', 'webp'];
-        
-        if (!in_array($fileExt, $allowedExts)) {
-            $errors[] = "$fileName: Invalid file type.";
-            continue;
-        }
-        
-        $newFileName = uniqid() . '_' . time() . '.' . $fileExt;
-        $destination = $uploadDir . $newFileName;
-        
-        if (move_uploaded_file($tmpName, $destination)) {
-            $uploadedFiles[] = [
-                'url' => 'https://uploads.healingcity.lk/uploads/' . $newFileName,
-                'name' => $fileName
-            ];
-        } else {
-            $errors[] = "$fileName: Failed to move file.";
-        }
-    } else {
-        $errors[] = "$fileName: Upload error code $error.";
-    }
-}
-
-if (empty($uploadedFiles)) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Failed to upload any files', 'errors' => $errors]);
+// ── RESOLVE ABSOLUTE PRIVATE DIRECTORY OUTSIDE WEB ROOT ────────────────────
+$docRoot = $_SERVER['DOCUMENT_ROOT'] ?? __DIR__;
+$parentDir = dirname($docRoot);
+if (is_dir($parentDir) && is_writable($parentDir)) {
+    $privateDir = $parentDir . '/private_kyc/';
 } else {
-    http_response_code(200);
-    echo json_encode(['success' => true, 'files' => $uploadedFiles, 'errors' => $errors]);
+    $privateDir = __DIR__ . '/private_kyc/';
 }
+
+if (!is_dir($privateDir)) {
+    mkdir($privateDir, 0750, true);
+    file_put_contents($privateDir . '.htaccess', "Require all denied\nDeny from all\n");
+}
+
+$legacyDir = __DIR__ . '/uploads/';
+
+// Key validation helper: Opaque format ONLY (kyc_<32_hex_chars>.<ext>)
+function isValidOpaqueKey($key) {
+    if (empty($key)) return false;
+    $sanitized = basename($key);
+    return preg_match('/^kyc_[a-f0-9]{32}\.(jpg|jpeg|png|webp|pdf|heic|heif)$/i', $sanitized) === 1;
+}
+
+$action = $_GET['action'] ?? ($_POST['action'] ?? 'upload_private');
+
+// ── OPERATION A: UPLOAD PRIVATE ─────────────────────────────────────────────
+if ($action === 'upload_private' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+
+    $files = [];
+    if (isset($_FILES['images'])) {
+        $files = $_FILES['images'];
+    } elseif (isset($_FILES['images[]'])) {
+        $files = $_FILES['images[]'];
+    }
+
+    if (empty($files) || empty($files['name'][0])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'No files uploaded']);
+        exit();
+    }
+
+    $uploadedFiles = [];
+    $errors = [];
+    $fileCount = is_array($files['name']) ? count($files['name']) : 1;
+
+    for ($i = 0; $i < $fileCount; $i++) {
+        $fileName = is_array($files['name']) ? $files['name'][$i] : $files['name'];
+        $tmpName  = is_array($files['tmp_name']) ? $files['tmp_name'][$i] : $files['tmp_name'];
+        $error    = is_array($files['error']) ? $files['error'][$i] : $files['error'];
+        $size     = is_array($files['size']) ? $files['size'][$i] : $files['size'];
+
+        if ($error === UPLOAD_ERR_OK) {
+            $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+            $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'heic', 'heif'];
+
+            if (!in_array($fileExt, $allowedExts)) {
+                $errors[] = "Invalid file extension.";
+                continue;
+            }
+
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeType = finfo_file($finfo, $tmpName);
+            finfo_close($finfo);
+
+            $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'image/heic', 'image/heif'];
+            if (!in_array($mimeType, $allowedMimes)) {
+                $errors[] = "Invalid mime type ($mimeType).";
+                continue;
+            }
+
+            $randomHex = bin2hex(random_bytes(16));
+            $opaqueKey = "kyc_{$randomHex}.{$fileExt}";
+            $destination = $privateDir . $opaqueKey;
+
+            if (move_uploaded_file($tmpName, $destination)) {
+                chmod($destination, 0640);
+                $uploadedFiles[] = [
+                    'key'  => $opaqueKey,
+                    'url'  => $opaqueKey,
+                    'size' => $size,
+                ];
+            } else {
+                $errors[] = "Failed to store file securely.";
+            }
+        } else {
+            $errors[] = "Upload error code $error.";
+        }
+    }
+
+    if (empty($uploadedFiles)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Upload failed', 'errors' => $errors]);
+    } else {
+        http_response_code(200);
+        echo json_encode(['success' => true, 'files' => $uploadedFiles]);
+    }
+    exit();
+}
+
+// ── OPERATION B: FETCH PRIVATE ──────────────────────────────────────────────
+if ($action === 'fetch_private' || $action === 'fetch') {
+    $key = $_GET['key'] ?? ($_POST['key'] ?? '');
+    $sanitizedKey = basename($key);
+
+    if (!isValidOpaqueKey($sanitizedKey)) {
+        http_response_code(400);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Invalid key format']);
+        exit();
+    }
+
+    $filePath = $privateDir . $sanitizedKey;
+    if (!file_exists($filePath)) {
+        http_response_code(404);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Document not found']);
+        exit();
+    }
+
+    $ext = strtolower(pathinfo($sanitizedKey, PATHINFO_EXTENSION));
+    $mimeTypes = [
+        'jpg'  => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png'  => 'image/png',
+        'webp' => 'image/webp',
+        'pdf'  => 'application/pdf',
+        'heic' => 'image/heic',
+        'heif' => 'image/heif',
+    ];
+    $contentType = $mimeTypes[$ext] ?? 'application/octet-stream';
+
+    header('Content-Type: ' . $contentType);
+    header('Content-Length: ' . filesize($filePath));
+    header('Content-Disposition: inline; filename="kyc_document"');
+    header('Cache-Control: private, no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Security-Policy: default-src \'none\'');
+
+    readfile($filePath);
+    exit();
+}
+
+// ── OPERATION C: VERIFY PRIVATE METADATA ───────────────────────────────────
+if ($action === 'verify_private_metadata') {
+    header('Content-Type: application/json');
+    $key = $_GET['key'] ?? ($_POST['key'] ?? '');
+    $sanitizedKey = basename($key);
+
+    if (!isValidOpaqueKey($sanitizedKey)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid key format']);
+        exit();
+    }
+
+    $filePath = $privateDir . $sanitizedKey;
+    if (!file_exists($filePath)) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Document not found']);
+        exit();
+    }
+
+    $size = filesize($filePath);
+    $sha256 = hash_file('sha256', $filePath);
+
+    http_response_code(200);
+    echo json_encode([
+        'success' => true,
+        'key' => $sanitizedKey,
+        'size' => $size,
+        'sha256' => $sha256,
+    ]);
+    exit();
+}
+
+// ── OPERATION D: MIGRATE LEGACY FILE FROM SERVER ────────────────────────────
+if ($action === 'migrate_legacy_file') {
+    header('Content-Type: application/json');
+    $legacyName = $_GET['legacy_filename'] ?? ($_POST['legacy_filename'] ?? '');
+    $sanitizedLegacy = basename($legacyName);
+
+    if (empty($sanitizedLegacy) || !preg_match('/^[a-zA-Z0-9_\-.]+\.(jpg|jpeg|png|webp|pdf|heic|heif)$/i', $sanitizedLegacy)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid legacy filename format']);
+        exit();
+    }
+
+    $sourcePath = $legacyDir . $sanitizedLegacy;
+    if (!file_exists($sourcePath)) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Legacy source file not found']);
+        exit();
+    }
+
+    $fileExt = strtolower(pathinfo($sanitizedLegacy, PATHINFO_EXTENSION));
+    $sourceSize = filesize($sourcePath);
+    $sourceSha256 = hash_file('sha256', $sourcePath);
+
+    $randomHex = bin2hex(random_bytes(16));
+    $opaqueKey = "kyc_{$randomHex}.{$fileExt}";
+    $destPath = $privateDir . $opaqueKey;
+
+    if (!copy($sourcePath, $destPath)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to copy file to private storage']);
+        exit();
+    }
+
+    chmod($destPath, 0640);
+    $destSize = filesize($destPath);
+    $destSha256 = hash_file('sha256', $destPath);
+
+    if ($sourceSize !== $destSize || $sourceSha256 !== $destSha256) {
+        @unlink($destPath);
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Checksum verification failed during migration']);
+        exit();
+    }
+
+    http_response_code(200);
+    echo json_encode([
+        'success' => true,
+        'opaque_key' => $opaqueKey,
+        'source_sha256' => $sourceSha256,
+        'dest_sha256' => $destSha256,
+        'size' => $destSize,
+    ]);
+    exit();
+}
+
+// ── OPERATION E: DELETE LEGACY PUBLIC FILE ──────────────────────────────────
+if ($action === 'delete_legacy_public_file') {
+    header('Content-Type: application/json');
+    $legacyName = $_GET['legacy_filename'] ?? ($_POST['legacy_filename'] ?? '');
+    $sanitizedLegacy = basename($legacyName);
+
+    if (empty($sanitizedLegacy) || !preg_match('/^[a-zA-Z0-9_\-.]+\.(jpg|jpeg|png|webp|pdf|heic|heif)$/i', $sanitizedLegacy)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid legacy filename format']);
+        exit();
+    }
+
+    $sourcePath = $legacyDir . $sanitizedLegacy;
+    if (!file_exists($sourcePath)) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Legacy public file not found or already deleted']);
+        exit();
+    }
+
+    if (unlink($sourcePath)) {
+        http_response_code(200);
+        echo json_encode(['success' => true, 'deleted' => true]);
+    } else {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to delete legacy public file']);
+    }
+    exit();
+}
+
+http_response_code(400);
+header('Content-Type: application/json');
+echo json_encode(['success' => false, 'message' => 'Invalid action']);
