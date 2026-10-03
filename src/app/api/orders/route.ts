@@ -116,6 +116,15 @@ export async function POST(req: Request) {
     })
     if (!customer) return NextResponse.json({ message: 'Customer not found' }, { status: 404 })
 
+    const customerType = customer.customerType || 'LOCAL'
+    const isForeign = customerType === 'FOREIGN'
+
+    // Fetch items from DB to get their foreign rates
+    const dbItems = await prisma.item.findMany({
+      where: { id: { in: items.map((i: any) => i.id) } },
+      select: { id: true, name: true, dailyRate: true, foreignDailyRate: true, foreignWeeklyRate: true, foreignMonthlyRate: true, foreignDepositAmount: true }
+    })
+
     // Determine initial booking status based on KYC
     const bookingStatus = customer.kycStatus === 'verified' ? 'confirmed' : 'pending_confirmation'
 
@@ -139,14 +148,20 @@ export async function POST(req: Request) {
         totalAmount: parseFloat(totalAmount) || 0,
         balanceDue: parseFloat(totalAmount) - parseFloat(advanceAmount || 0),
         notes,
+        pricingCustomerType: customerType,
+        appliedRateType: isForeign ? 'FOREIGN' : 'LOCAL',
         bookingItems: {
-          create: items.map((item: any) => ({
-            itemId: item.id,
-            quantity: item.quantity || 1,
-            dailyRate: parseFloat(item.dailyRate),
-            days,
-            itemTotal: parseFloat(item.dailyRate) * (item.quantity || 1) * days,
-          })),
+          create: items.map((item: any) => {
+            const dbItem = dbItems.find(i => i.id === item.id)
+            const effectiveDailyRate = (isForeign && dbItem?.foreignDailyRate) ? dbItem.foreignDailyRate : (dbItem?.dailyRate || parseFloat(item.dailyRate))
+            return {
+              itemId: item.id,
+              quantity: item.quantity || 1,
+              dailyRate: effectiveDailyRate,
+              days,
+              itemTotal: effectiveDailyRate * (item.quantity || 1) * days,
+            }
+          }),
         },
       },
       include: { bookingItems: true },

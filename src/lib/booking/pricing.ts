@@ -17,6 +17,13 @@ export type PricingInput = {
   setupCharge?: number
   discount?: number
   advancePercent?: number // Default 30
+  // Foreign customer pricing
+  customerType?: 'LOCAL' | 'FOREIGN' | string | null
+  foreignDailyRate?: number | null
+  foreignWeeklyRate?: number | null
+  foreignMonthlyRate?: number | null
+  foreignHourlyRate?: number | null
+  foreignSecurityDeposit?: number | null
 }
 
 export type PricingResult = {
@@ -32,6 +39,8 @@ export type PricingResult = {
   advanceRequired: number
   balanceDue: number
   priceBreakdown: string
+  appliedRateType: 'LOCAL' | 'FOREIGN' | 'FOREIGN_FALLBACK_TO_LOCAL'
+  appliedDailyRate: number
 }
 
 /**
@@ -140,6 +149,38 @@ export function calculateRentalCharge(
 }
 
 /**
+ * Determine effective pricing rates based on customer type.
+ * Foreign customers get foreign rates if configured, otherwise fallback to local.
+ */
+function resolveEffectiveRates(input: PricingInput): {
+  effectiveDailyRate: number
+  effectiveWeeklyRate: number | null | undefined
+  effectiveMonthlyRate: number | null | undefined
+  effectiveDeposit: number | null | undefined
+  appliedRateType: 'LOCAL' | 'FOREIGN' | 'FOREIGN_FALLBACK_TO_LOCAL'
+} {
+  let effectiveDailyRate = input.dailyRate
+  let effectiveWeeklyRate = input.weeklyRate
+  let effectiveMonthlyRate = input.monthlyRate
+  let effectiveDeposit = input.securityDeposit
+  let appliedRateType: 'LOCAL' | 'FOREIGN' | 'FOREIGN_FALLBACK_TO_LOCAL' = 'LOCAL'
+
+  if (input.customerType === 'FOREIGN') {
+    if (input.foreignDailyRate != null && input.foreignDailyRate > 0) {
+      effectiveDailyRate = input.foreignDailyRate
+      effectiveWeeklyRate = input.foreignWeeklyRate ?? null
+      effectiveMonthlyRate = input.foreignMonthlyRate ?? null
+      effectiveDeposit = input.foreignSecurityDeposit ?? input.securityDeposit
+      appliedRateType = 'FOREIGN'
+    } else {
+      appliedRateType = 'FOREIGN_FALLBACK_TO_LOCAL'
+    }
+  }
+
+  return { effectiveDailyRate, effectiveWeeklyRate, effectiveMonthlyRate, effectiveDeposit, appliedRateType }
+}
+
+/**
  * Full price calculation for a booking request.
  */
 export function calculateBookingPricing(input: PricingInput): PricingResult {
@@ -164,17 +205,20 @@ export function calculateBookingPricing(input: PricingInput): PricingResult {
     input.returnTime,
   )
 
+  // Resolve effective rates based on customer type
+  const { effectiveDailyRate, effectiveWeeklyRate, effectiveMonthlyRate, effectiveDeposit, appliedRateType } = resolveEffectiveRates(input)
+
   const rentalCharge = calculateRentalCharge(
     rentalDays,
-    input.dailyRate,
-    input.weeklyRate,
-    input.monthlyRate
+    effectiveDailyRate,
+    effectiveWeeklyRate,
+    effectiveMonthlyRate
   )
 
   const deliveryCharge = input.deliveryCharge || 0
   const setupCharge = input.setupCharge || 0
   const discount = input.discount || 0
-  const securityDeposit = input.securityDeposit || 0
+  const securityDeposit = effectiveDeposit || 0
   const advancePercent = input.advancePercent ?? 30
 
   const rentalSubtotal = rentalCharge + deliveryCharge + setupCharge - discount
@@ -185,9 +229,9 @@ export function calculateBookingPricing(input: PricingInput): PricingResult {
   // Build breakdown text
   const lines: string[] = []
   if (rentalDays === 1 && durationHours < 24 && durationHours > 0) {
-    lines.push(`Rental: ${Math.round(durationHours)} hours (1 day minimum) × Rs. ${input.dailyRate.toLocaleString()} = Rs. ${rentalCharge.toLocaleString()}`)
+    lines.push(`Rental: ${Math.round(durationHours)} hours (1 day minimum) × Rs. ${effectiveDailyRate.toLocaleString()} = Rs. ${rentalCharge.toLocaleString()}`)
   } else {
-    lines.push(`Rental: ${rentalDays} day${rentalDays !== 1 ? 's' : ''} × Rs. ${input.dailyRate.toLocaleString()} = Rs. ${rentalCharge.toLocaleString()}`)
+    lines.push(`Rental: ${rentalDays} day${rentalDays !== 1 ? 's' : ''} × Rs. ${effectiveDailyRate.toLocaleString()} = Rs. ${rentalCharge.toLocaleString()}`)
   }
   if (deliveryCharge > 0) lines.push(`Delivery: Rs. ${deliveryCharge.toLocaleString()}`)
   if (setupCharge > 0) lines.push(`Setup: Rs. ${setupCharge.toLocaleString()}`)
@@ -210,6 +254,8 @@ export function calculateBookingPricing(input: PricingInput): PricingResult {
     advanceRequired,
     balanceDue,
     priceBreakdown: lines.join('\n'),
+    appliedRateType,
+    appliedDailyRate: effectiveDailyRate,
   }
 }
 

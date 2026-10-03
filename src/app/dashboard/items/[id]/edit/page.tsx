@@ -42,6 +42,11 @@ export default function EditItemPage() {
     weeklyRate: '',
     monthlyRate: '',
     depositAmount: '',
+    foreignDailyRate: '',
+    foreignHourlyRate: '',
+    foreignWeeklyRate: '',
+    foreignMonthlyRate: '',
+    foreignDepositAmount: '',
     bufferHours: '2',
     purchasePrice: '',
     replacementCost: '',
@@ -90,6 +95,11 @@ export default function EditItemPage() {
             weeklyRate: data.weeklyRate?.toString() || '',
             monthlyRate: data.monthlyRate?.toString() || '',
             depositAmount: data.depositAmount?.toString() || '',
+            foreignDailyRate: data.foreignDailyRate?.toString() || '',
+            foreignHourlyRate: data.foreignHourlyRate?.toString() || '',
+            foreignWeeklyRate: data.foreignWeeklyRate?.toString() || '',
+            foreignMonthlyRate: data.foreignMonthlyRate?.toString() || '',
+            foreignDepositAmount: data.foreignDepositAmount?.toString() || '',
             bufferHours: data.bufferHours?.toString() || '2',
             purchasePrice: data.purchasePrice?.toString() || '',
             replacementCost: data.replacementCost?.toString() || '',
@@ -282,6 +292,11 @@ export default function EditItemPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          foreignDailyRate: form.foreignDailyRate ? parseFloat(form.foreignDailyRate) : null,
+          foreignHourlyRate: form.foreignHourlyRate ? parseFloat(form.foreignHourlyRate) : null,
+          foreignWeeklyRate: form.foreignWeeklyRate ? parseFloat(form.foreignWeeklyRate) : null,
+          foreignMonthlyRate: form.foreignMonthlyRate ? parseFloat(form.foreignMonthlyRate) : null,
+          foreignDepositAmount: form.foreignDepositAmount ? parseFloat(form.foreignDepositAmount) : null,
           categorySlug: selectedCategorySlug,
           customCategoryName: selectedCategorySlug === 'other' ? customCategoryName : undefined,
           customFields: selectedCategorySlug === 'other' ? customFields : undefined,
@@ -613,59 +628,121 @@ export default function EditItemPage() {
             <h2 className="text-base font-semibold text-slate-900">Pricing & Security Deposit</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Daily Rate (LKR) <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="dailyRate"
-                type="number"
-                required
-                value={form.dailyRate}
-                onChange={handleFormChange}
-                placeholder="e.g. 5500"
-                className={`w-full border ${
-                  formErrors.dailyRate ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 focus:ring-blue-500'
-                } rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2`}
-              />
-              {formErrors.dailyRate && <p className="text-xs text-red-600 mt-1">{formErrors.dailyRate}</p>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Daily Rate */}
+            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Daily Rate (Local LKR) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="dailyRate"
+                  type="number"
+                  required
+                  value={form.dailyRate}
+                  onChange={handleFormChange}
+                  placeholder="e.g. 5500"
+                  className={`w-full border ${
+                    formErrors.dailyRate ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 focus:ring-blue-500'
+                  } rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white`}
+                />
+                {formErrors.dailyRate && <p className="text-xs text-red-600 mt-1">{formErrors.dailyRate}</p>}
+              </div>
+              <div className="pl-3 border-l-2 border-blue-200">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Daily Rate (Foreign)
+                </label>
+                <input
+                  name="foreignDailyRate"
+                  type="number"
+                  value={form.foreignDailyRate}
+                  onChange={handleFormChange}
+                  placeholder="e.g. 7500"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Leave blank to charge foreign customers the same local price.</p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Security Deposit (LKR)</label>
-              <input
-                name="depositAmount"
-                type="number"
-                value={form.depositAmount}
-                onChange={handleFormChange}
-                placeholder="e.g. 15000"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            {/* Security Deposit */}
+            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Security Deposit (Local LKR)</label>
+                <input
+                  name="depositAmount"
+                  type="number"
+                  value={form.depositAmount}
+                  onChange={handleFormChange}
+                  placeholder="e.g. 15000"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+              </div>
+              <div className="pl-3 border-l-2 border-blue-200">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Security Deposit (Foreign)</label>
+                <input
+                  name="foreignDepositAmount"
+                  type="number"
+                  value={form.foreignDepositAmount}
+                  onChange={handleFormChange}
+                  placeholder="e.g. 25000"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Leave blank to charge foreign customers the same local deposit.</p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Weekly Rate (LKR)</label>
-              <input
-                name="weeklyRate"
-                type="number"
-                value={form.weeklyRate}
-                onChange={handleFormChange}
-                placeholder="Optional discount weekly price"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            {/* Weekly Rate */}
+            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Weekly Rate (Local LKR)</label>
+                <input
+                  name="weeklyRate"
+                  type="number"
+                  value={form.weeklyRate}
+                  onChange={handleFormChange}
+                  placeholder="Optional discount weekly price"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+              </div>
+              <div className="pl-3 border-l-2 border-blue-200">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Weekly Rate (Foreign)</label>
+                <input
+                  name="foreignWeeklyRate"
+                  type="number"
+                  value={form.foreignWeeklyRate}
+                  onChange={handleFormChange}
+                  placeholder="Optional foreign weekly price"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Leave blank to charge foreign customers the same local price.</p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Monthly Rate (LKR)</label>
-              <input
-                name="monthlyRate"
-                type="number"
-                value={form.monthlyRate}
-                onChange={handleFormChange}
-                placeholder="Optional discount monthly price"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            {/* Monthly Rate */}
+            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Monthly Rate (Local LKR)</label>
+                <input
+                  name="monthlyRate"
+                  type="number"
+                  value={form.monthlyRate}
+                  onChange={handleFormChange}
+                  placeholder="Optional discount monthly price"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+              </div>
+              <div className="pl-3 border-l-2 border-blue-200">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Monthly Rate (Foreign)</label>
+                <input
+                  name="foreignMonthlyRate"
+                  type="number"
+                  value={form.foreignMonthlyRate}
+                  onChange={handleFormChange}
+                  placeholder="Optional foreign monthly price"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Leave blank to charge foreign customers the same local price.</p>
+              </div>
             </div>
           </div>
         </div>

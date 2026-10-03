@@ -61,7 +61,9 @@ export async function POST(req: Request) {
     const { 
       itemId, title, description, city, address, 
       hourlyPrice, dailyPrice, weeklyPrice, monthlyPrice, 
-      securityDeposit, coverImageUrl, galleryImages 
+      securityDeposit, coverImageUrl, galleryImages,
+      foreignDailyPrice, foreignHourlyPrice, foreignWeeklyPrice,
+      foreignMonthlyPrice, foreignSecurityDeposit
     } = body
 
     if (!itemId) {
@@ -119,6 +121,11 @@ export async function POST(req: Request) {
           weeklyPrice: weeklyPrice || item.weeklyRate || null,
           monthlyPrice: monthlyPrice || item.monthlyRate || null,
           securityDeposit: securityDeposit || item.depositAmount || 0,
+          foreignDailyPrice: foreignDailyPrice !== undefined ? foreignDailyPrice : (item.foreignDailyRate || null),
+          foreignHourlyPrice: foreignHourlyPrice !== undefined ? foreignHourlyPrice : (item.foreignHourlyRate || null),
+          foreignWeeklyPrice: foreignWeeklyPrice !== undefined ? foreignWeeklyPrice : (item.foreignWeeklyRate || null),
+          foreignMonthlyPrice: foreignMonthlyPrice !== undefined ? foreignMonthlyPrice : (item.foreignMonthlyRate || null),
+          foreignSecurityDeposit: foreignSecurityDeposit !== undefined ? foreignSecurityDeposit : (item.foreignDepositAmount || null),
           coverImageUrl: finalCover,
           galleryImages: galleryImages ? (typeof galleryImages === 'string' ? galleryImages : JSON.stringify(galleryImages)) : existingAd.galleryImages,
           isPublished: true,
@@ -140,6 +147,11 @@ export async function POST(req: Request) {
           weeklyPrice: weeklyPrice || item.weeklyRate || null,
           monthlyPrice: monthlyPrice || item.monthlyRate || null,
           securityDeposit: securityDeposit || item.depositAmount || 0,
+          foreignDailyPrice: foreignDailyPrice !== undefined ? foreignDailyPrice : (item.foreignDailyRate || null),
+          foreignHourlyPrice: foreignHourlyPrice !== undefined ? foreignHourlyPrice : (item.foreignHourlyRate || null),
+          foreignWeeklyPrice: foreignWeeklyPrice !== undefined ? foreignWeeklyPrice : (item.foreignWeeklyRate || null),
+          foreignMonthlyPrice: foreignMonthlyPrice !== undefined ? foreignMonthlyPrice : (item.foreignMonthlyRate || null),
+          foreignSecurityDeposit: foreignSecurityDeposit !== undefined ? foreignSecurityDeposit : (item.foreignDepositAmount || null),
           coverImageUrl: finalCover,
           galleryImages: galleryImages ? (typeof galleryImages === 'string' ? galleryImages : JSON.stringify(galleryImages)) : null,
           isPublished: true,

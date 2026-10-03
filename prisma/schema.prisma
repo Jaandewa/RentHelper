@@ -235,6 +235,11 @@ model Item {
   dailyRate           Float
   weeklyRate          Float?
   monthlyRate         Float?
+  foreignHourlyRate   Float?
+  foreignDailyRate    Float?
+  foreignWeeklyRate   Float?
+  foreignMonthlyRate  Float?
+  foreignDepositAmount Float?
   depositAmount       Float     @default(0)
   bufferHours         Int       @default(2)
   lastServiceDate     DateTime?
@@ -322,6 +327,10 @@ model Booking {
   weeklyRateSnapshot    Float?
   monthlyRateSnapshot   Float?
   setupCharge           Float     @default(0)
+  
+  // Customer type pricing snapshot
+  pricingCustomerType   String?   // LOCAL, FOREIGN
+  appliedRateType       String?   // LOCAL, FOREIGN, FOREIGN_FALLBACK_TO_LOCAL
   
   // Provider decision tracking
   providerDecisionAt    DateTime?
@@ -621,6 +630,11 @@ model RentalAd {
   weeklyPrice     Float?
   monthlyPrice    Float?
   securityDeposit Float?
+  foreignHourlyPrice     Float?
+  foreignDailyPrice      Float?
+  foreignWeeklyPrice     Float?
+  foreignMonthlyPrice    Float?
+  foreignSecurityDeposit Float?
   isPublished     Boolean  @default(false)
   isFeatured      Boolean  @default(false)
   isAvailable     Boolean  @default(true)

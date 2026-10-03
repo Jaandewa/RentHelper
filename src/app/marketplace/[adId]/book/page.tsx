@@ -106,6 +106,11 @@ export default function BookNowPage({ params }: { params: Promise<{ adId: string
         monthlyRate: ad.monthlyPrice || ad.item?.monthlyRate,
         hourlyRate: ad.hourlyPrice || ad.item?.hourlyRate,
         securityDeposit: ad.securityDeposit,
+        customerType: user?.customerProfile?.customerType || 'LOCAL',
+        foreignDailyRate: ad.foreignDailyPrice,
+        foreignWeeklyRate: ad.foreignWeeklyPrice,
+        foreignMonthlyRate: ad.foreignMonthlyPrice,
+        foreignSecurityDeposit: ad.foreignSecurityDeposit,
         deliveryCharge: deliveryRequired ? (ad.deliveryRate || 0) : 0,
         setupCharge: 0,
         discount: 0,
@@ -123,11 +128,12 @@ export default function BookNowPage({ params }: { params: Promise<{ adId: string
   }, [ad])
 
   // Daily rate for display
-  const dailyRate = ad ? (ad.dailyPrice || ad.item?.dailyRate || 0) : 0
-  const weeklyRate = ad ? (ad.weeklyPrice || ad.item?.weeklyRate) : null
-  const monthlyRate = ad ? (ad.monthlyPrice || ad.item?.monthlyRate) : null
+  const isForeign = user?.customerProfile?.customerType === 'FOREIGN'
+  const dailyRate = ad ? (isForeign && ad.foreignDailyPrice ? ad.foreignDailyPrice : (ad.dailyPrice || ad.item?.dailyRate || 0)) : 0
+  const weeklyRate = ad ? (isForeign && ad.foreignWeeklyPrice ? ad.foreignWeeklyPrice : (ad.weeklyPrice || ad.item?.weeklyRate)) : null
+  const monthlyRate = ad ? (isForeign && ad.foreignMonthlyPrice ? ad.foreignMonthlyPrice : (ad.monthlyPrice || ad.item?.monthlyRate)) : null
   const hourlyRate = ad ? (ad.hourlyPrice || ad.item?.hourlyRate) : null
-  const securityDeposit = ad ? (ad.securityDeposit || 0) : 0
+  const securityDeposit = ad ? (isForeign && ad.foreignSecurityDeposit != null ? ad.foreignSecurityDeposit : (ad.securityDeposit || 0)) : 0
 
   if (loading) {
     return (

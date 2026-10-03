@@ -20,6 +20,7 @@ interface CustomerOption {
   email: string
   kycStatus: string
   trustScore: number
+  customerType?: string
 }
 
 interface ItemOption {
@@ -29,9 +30,13 @@ interface ItemOption {
   dailyRate: number
   depositAmount: number
   status: string
+  foreignDailyRate?: number | null
+  foreignWeeklyRate?: number | null
+  foreignMonthlyRate?: number | null
+  foreignDepositAmount?: number | null
 }
 
-type SelectedItem = { id: string; name: string; dailyRate: number; depositAmount: number; quantity: number }
+type SelectedItem = { id: string; name: string; dailyRate: number; depositAmount: number; quantity: number; foreignDailyRate?: number | null; foreignDepositAmount?: number | null; appliedRate?: number; isForeignRateApplied?: boolean; missingForeignRate?: boolean }
 
 function NewBookingInner() {
   const router = useRouter()
@@ -74,6 +79,7 @@ function NewBookingInner() {
             email: c.email || c.user?.email || '',
             kycStatus: c.kycStatus || 'not_submitted',
             trustScore: c.trustScore || 0,
+            customerType: c.customerType || 'LOCAL',
           }))
           setCustomers(formatted)
 
@@ -148,6 +154,7 @@ function NewBookingInner() {
             email: c.maskedEmail || '',
             kycStatus: c.kycStatus || 'not_submitted',
             trustScore: c.trustScore || 0,
+            customerType: c.customerType || 'LOCAL',
           }))
           setSearchResults(formatted)
         }
@@ -167,7 +174,19 @@ function NewBookingInner() {
   )
 
   const addItem = (item: ItemOption) => {
-    setSelectedItems(prev => [...prev, { ...item, dailyRate: item.dailyRate || 0, depositAmount: item.depositAmount || 0, quantity: 1 }])
+    const isForeign = selectedCustomer?.customerType === 'FOREIGN'
+    const hasForeignRate = item.foreignDailyRate != null && item.foreignDailyRate > 0
+    const appliedRate = isForeign && hasForeignRate ? item.foreignDailyRate! : (item.dailyRate || 0)
+    
+    setSelectedItems(prev => [...prev, { 
+      ...item, 
+      dailyRate: item.dailyRate || 0, 
+      depositAmount: item.depositAmount || 0, 
+      quantity: 1,
+      appliedRate,
+      isForeignRateApplied: isForeign && hasForeignRate,
+      missingForeignRate: isForeign && !hasForeignRate
+    }])
   }
 
   const removeItem = (id: string) => {
@@ -178,8 +197,8 @@ function NewBookingInner() {
     ? Math.max(1, Math.ceil((new Date(dates.returnDate).getTime() - new Date(dates.pickupDate).getTime()) / (1000 * 60 * 60 * 24)))
     : 0
 
-  const subtotal = selectedItems.reduce((sum, item) => sum + item.dailyRate * item.quantity * (days || 1), 0)
-  const totalDeposit = selectedItems.reduce((sum, item) => sum + item.depositAmount * item.quantity, 0)
+  const subtotal = selectedItems.reduce((sum, item) => sum + (item.appliedRate || item.dailyRate) * item.quantity * (days || 1), 0)
+  const totalDeposit = selectedItems.reduce((sum, item) => sum + (item.isForeignRateApplied && item.foreignDepositAmount != null ? item.foreignDepositAmount : item.depositAmount) * item.quantity, 0)
   const totalAmount = subtotal + pricing.deliveryCharge - pricing.discountAmount
   const advanceAmount = Math.round(totalAmount * pricing.advancePercent / 100)
 
@@ -393,6 +412,7 @@ function NewBookingInner() {
                       email: c.maskedEmail || '',
                       kycStatus: c.kycStatus || 'not_submitted',
                       trustScore: c.trustScore || 0,
+                      customerType: c.customerType || 'LOCAL',
                     })}
                     className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-colors text-left ${
                       selectedCustomer?.id === c.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
@@ -447,7 +467,15 @@ function NewBookingInner() {
                 <div key={item.id} className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                    <p className="text-xs text-gray-500">Rs. {item.dailyRate.toLocaleString()}/day</p>
+                    <p className="text-xs text-gray-500">
+                      Rate: Rs. {(item.appliedRate || item.dailyRate).toLocaleString()}/day 
+                      {item.isForeignRateApplied ? ' (Foreign rate)' : ' (Local rate)'}
+                    </p>
+                    {item.missingForeignRate && (
+                      <p className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5">
+                        <AlertCircle className="w-3 h-3" /> ℹ️ Foreign price not configured for this item. Local price applied.
+                      </p>
+                    )}
                   </div>
                   <button onClick={() => removeItem(item.id)} className="text-gray-400 hover:text-red-500">
                     <X className="w-4 h-4" />
@@ -477,8 +505,21 @@ function NewBookingInner() {
                   <p className="text-xs text-gray-500">{item.sku || 'No SKU'}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900">Rs. {item.dailyRate.toLocaleString()}/day</p>
-                  <p className="text-xs text-gray-500">Deposit: Rs. {item.depositAmount.toLocaleString()}</p>
+                  {selectedCustomer?.customerType === 'FOREIGN' && item.foreignDailyRate ? (
+                    <>
+                      <p className="text-sm font-bold text-gray-900">Rs. {item.foreignDailyRate.toLocaleString()}/day</p>
+                      <p className="text-[10px] text-blue-600 font-medium">Foreign Rate</p>
+                      <p className="text-xs text-gray-500">Deposit: Rs. {(item.foreignDepositAmount || item.depositAmount).toLocaleString()}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-bold text-gray-900">Rs. {item.dailyRate.toLocaleString()}/day</p>
+                      {selectedCustomer?.customerType === 'FOREIGN' && (
+                        <p className="text-[10px] text-amber-600 font-medium">Local Rate (Fallback)</p>
+                      )}
+                      <p className="text-xs text-gray-500">Deposit: Rs. {item.depositAmount.toLocaleString()}</p>
+                    </>
+                  )}
                 </div>
               </button>
             ))}

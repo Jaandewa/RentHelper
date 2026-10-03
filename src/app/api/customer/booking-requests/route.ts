@@ -56,12 +56,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Item is not available for these dates' }, { status: 409 })
     }
 
+    const customerType = customerProfile.customerType || 'LOCAL'
+    const isForeign = customerType === 'FOREIGN'
+
     // Server-side price recalculation — never trust client values
     const pricing = calculateBookingPricing({
       pickupDate,
       returnDate,
       pickupTime,
       returnTime,
+      customerType,
+      foreignDailyRate: ad.foreignDailyPrice ?? ad.item?.foreignDailyRate ?? null,
+      foreignWeeklyRate: ad.foreignWeeklyPrice ?? ad.item?.foreignWeeklyRate ?? null,
+      foreignMonthlyRate: ad.foreignMonthlyPrice ?? ad.item?.foreignMonthlyRate ?? null,
+      foreignSecurityDeposit: ad.foreignSecurityDeposit ?? ad.item?.foreignDepositAmount ?? null,
       dailyRate: ad.dailyPrice || ad.item.dailyRate,
       weeklyRate: ad.weeklyPrice || ad.item.weeklyRate,
       monthlyRate: ad.monthlyPrice || ad.item.monthlyRate,
@@ -111,13 +119,17 @@ export async function POST(req: Request) {
         monthlyRateSnapshot: ad.monthlyPrice || ad.item.monthlyRate,
         hourlyRateSnapshot: ad.hourlyPrice || ad.item.hourlyRate,
         source: 'customer_marketplace',
+        pricingCustomerType: customerType,
+        appliedRateType: isForeign ? (ad.foreignDailyPrice || ad.item?.foreignDailyRate ? 'FOREIGN' : 'FOREIGN_FALLBACK_TO_LOCAL') : 'LOCAL',
         notes: customerNotes,
         // Booking items
         bookingItems: {
           create: [{
             itemId: ad.item.id,
             quantity: 1,
-            dailyRate: ad.dailyPrice || ad.item.dailyRate,
+            dailyRate: (isForeign && (ad.foreignDailyPrice || ad.item?.foreignDailyRate))
+                         ? (ad.foreignDailyPrice || ad.item?.foreignDailyRate || 0)
+                         : (ad.dailyPrice || ad.item.dailyRate || 0),
             days: pricing.rentalDays,
             itemTotal: pricing.rentalCharge,
           }],
@@ -139,7 +151,7 @@ export async function POST(req: Request) {
       if (ad.business.phone) {
         await sendBookingRequestWhatsApp(ad.business.phone, {
           requestNumber: bookingNumber,
-          customerName: booking.customer.user.name || 'Customer',
+          customerName: customerProfile.user?.name || 'Customer',
           itemName: ad.item.name,
           pickupDateTime: `${pickupDate} ${pickupTime || ''}`.trim(),
           returnDateTime: `${returnDate} ${returnTime || ''}`.trim(),

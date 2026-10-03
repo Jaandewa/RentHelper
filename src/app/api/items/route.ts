@@ -66,7 +66,9 @@ export async function POST(req: Request) {
       description, conditionGrade, dailyRate, weeklyRate,
       monthlyRate, depositAmount, bufferHours, purchasePrice,
       replacementCost, notes, accessories, categoryData,
-      customCategoryName, customFields
+      customCategoryName, customFields,
+      foreignDailyRate, foreignHourlyRate, foreignWeeklyRate,
+      foreignMonthlyRate, foreignDepositAmount
     } = body
 
     if (!categorySlug) {
@@ -159,6 +161,11 @@ export async function POST(req: Request) {
         bufferHours: bufferHours ? parseInt(bufferHours) : 2,
         purchasePrice: purchasePrice ? parseFloat(purchasePrice) : null,
         replacementCost: replacementCost ? parseFloat(replacementCost) : null,
+        foreignDailyRate: foreignDailyRate !== undefined && foreignDailyRate !== null ? parseFloat(foreignDailyRate) : null,
+        foreignHourlyRate: foreignHourlyRate !== undefined && foreignHourlyRate !== null ? parseFloat(foreignHourlyRate) : null,
+        foreignWeeklyRate: foreignWeeklyRate !== undefined && foreignWeeklyRate !== null ? parseFloat(foreignWeeklyRate) : null,
+        foreignMonthlyRate: foreignMonthlyRate !== undefined && foreignMonthlyRate !== null ? parseFloat(foreignMonthlyRate) : null,
+        foreignDepositAmount: foreignDepositAmount !== undefined && foreignDepositAmount !== null ? parseFloat(foreignDepositAmount) : null,
         notes,
         accessories: accessories ? JSON.stringify(accessories) : null,
         categoryData: categoryData || null,
