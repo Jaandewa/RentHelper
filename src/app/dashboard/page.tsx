@@ -49,7 +49,8 @@ export default async function DashboardHome() {
     _sum: { amount: true },
     where: {
       booking: { businessId },
-      paidAt: { gte: currentMonthStart }
+      paidAt: { gte: currentMonthStart },
+      type: { in: ['advance', 'balance'] },
     }
   })
   const revenue = revenueResult._sum.amount || 0

@@ -1,145 +1,237 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { BarChart3, TrendingUp, TrendingDown, Package, Users, ClipboardList, DollarSign, Download, Calendar } from 'lucide-react'
-
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-const revenueData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-const topItems: any[] = []
-
-const categoryData: any[] = []
+import React, { useState, useEffect } from 'react';
+import { 
+  BarChart3, TrendingUp, DollarSign, Package, Users, 
+  ClipboardList, Download, Calendar, Loader2, Shield, 
+  ArrowDownCircle, ArrowUpCircle 
+} from 'lucide-react';
 
 export default function ReportsPage() {
-  const [period, setPeriod] = useState('month')
-  const maxRevenue = Math.max(...revenueData, 0)
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
-  const totalRevenue = revenueData.reduce((a, b) => a + b, 0)
-  const activeMonths = revenueData.filter(v => v > 0).length
-  const avgMonthly = activeMonths > 0 ? Math.round(totalRevenue / activeMonths) : 0
+  useEffect(() => {
+    fetchData();
+  }, [dateFrom, dateTo]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (dateFrom) params.append('dateFrom', dateFrom);
+      if (dateTo) params.append('dateTo', dateTo);
+      
+      const res = await fetch(`/api/provider/finance?${params.toString()}`);
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+      }
+    } catch (error) {
+      console.error('Failed to fetch report data', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && !data) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  const {
+    grossRentalValue = 0,
+    rentalPaymentsReceived = 0,
+    outstandingBalance = 0,
+    activeRentals = 0,
+    confirmedBookings = 0,
+    completedBookings = 0,
+    cancelledBookings = 0,
+    depositsHeld = 0,
+    depositsRefunded = 0,
+    depositDeductions = 0,
+    monthlyRevenue = [],
+    topItems = []
+  } = data || {};
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-sm text-gray-500 mt-1">Track your business performance</p>
+          <h1 className="text-2xl font-bold text-gray-900">Financial Reports</h1>
+          <p className="text-gray-500">Overview of your rental business performance</p>
         </div>
-        <div className="flex gap-2">
-          <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-            {['week', 'month', 'year'].map(p => (
-              <button key={p} onClick={() => setPeriod(p)}
-                className={`px-3 py-2 text-sm font-medium capitalize ${period === p ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                {p}
-              </button>
-            ))}
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-2 shadow-sm">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <input 
+              type="date" 
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-sm outline-none bg-transparent"
+            />
+            <span className="text-gray-400">-</span>
+            <input 
+              type="date" 
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-sm outline-none bg-transparent"
+            />
           </div>
-          <button className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-            <Download className="w-4 h-4" /> Export
+          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-sm font-medium">
+            <Download className="w-4 h-4" />
+            Export
           </button>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Revenue (YTD)', value: `Rs. ${(totalRevenue / 1000).toFixed(0)}K`, change: '', up: true, icon: DollarSign, color: 'text-green-600 bg-green-50' },
-          { label: 'Total Bookings', value: '0', change: '', up: true, icon: ClipboardList, color: 'text-blue-600 bg-blue-50' },
-          { label: 'Active Customers', value: '0', change: '', up: true, icon: Users, color: 'text-purple-600 bg-purple-50' },
-          { label: 'Avg Utilization', value: '0%', change: '', up: true, icon: Package, color: 'text-amber-600 bg-amber-50' },
-        ].map(kpi => (
-          <div key={kpi.label} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-            <div className="flex justify-between items-start mb-3">
-              <div className={`p-2 rounded-lg ${kpi.color}`}>
-                <kpi.icon className="w-5 h-5" />
-              </div>
-              <span className={`flex items-center gap-0.5 text-xs font-medium ${kpi.up ? 'text-green-600' : 'text-red-500'}`}>
-                {kpi.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                {kpi.change}
-              </span>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col">
+          <div className="flex justify-between items-start mb-4">
+            <div className="text-sm font-medium text-gray-500">Gross Rental Value</div>
+            <div className="p-2 bg-green-100 rounded-lg text-green-600">
+              <TrendingUp className="w-5 h-5" />
             </div>
-            <p className="text-xs text-gray-500">{kpi.label}</p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{kpi.value}</p>
           </div>
-        ))}
-      </div>
-
-      {/* Revenue Chart */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Monthly Revenue</h2>
-            <p className="text-sm text-gray-500">Avg Rs. {avgMonthly.toLocaleString()}/month</p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-gray-900">Rs. {(totalRevenue / 1000).toFixed(0)}K</p>
-            <p className="text-xs text-green-600 font-medium">+18% vs last year</p>
-          </div>
+          <div className="text-2xl font-bold text-gray-900">Rs. {grossRentalValue.toLocaleString()}</div>
         </div>
-        <div className="flex items-end gap-2 h-48">
-          {revenueData.map((val, idx) => (
-            <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-              <div
-                className={`w-full rounded-t-md transition-all ${val > 0 ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-100'}`}
-                style={{ height: `${maxRevenue > 0 ? (val / maxRevenue) * 100 : 0}%`, minHeight: val > 0 ? '4px' : '0' }}
-                title={`Rs. ${val.toLocaleString()}`}
-              />
-              <span className="text-xs text-gray-400">{MONTHS_SHORT[idx]}</span>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col">
+          <div className="flex justify-between items-start mb-4">
+            <div className="text-sm font-medium text-gray-500">Payments Received</div>
+            <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+              <DollarSign className="w-5 h-5" />
             </div>
-          ))}
+          </div>
+          <div className="text-2xl font-bold text-gray-900">Rs. {rentalPaymentsReceived.toLocaleString()}</div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col">
+          <div className="flex justify-between items-start mb-4">
+            <div className="text-sm font-medium text-gray-500">Outstanding Balance</div>
+            <div className="p-2 bg-amber-100 rounded-lg text-amber-600">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-gray-900">Rs. {outstandingBalance.toLocaleString()}</div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex flex-col">
+          <div className="flex justify-between items-start mb-4">
+            <div className="text-sm font-medium text-gray-500">Active Rentals</div>
+            <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
+              <Users className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-gray-900">{activeRentals}</div>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Top Items */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Top Performing Items</h2>
-          <div className="space-y-4">
-            {topItems.map((item, idx) => (
-              <div key={idx}>
-                <div className="flex justify-between items-center mb-1">
-                  <p className="text-sm font-medium text-gray-900 truncate flex-1">{item.name}</p>
-                  <p className="text-sm font-bold text-gray-900 ml-2">Rs. {(item.revenue / 1000).toFixed(0)}K</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-100 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${item.utilization}%` }} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Booking Status Cards */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-gray-500" />
+            Booking Status
+          </h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-2xl font-bold text-gray-900">{confirmedBookings}</div>
+              <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mt-1">Confirmed</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-2xl font-bold text-gray-900">{completedBookings}</div>
+              <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mt-1">Completed</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-2xl font-bold text-gray-900">{cancelledBookings}</div>
+              <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mt-1">Cancelled</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Deposit Summary Cards */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-gray-500" />
+            Security Deposits
+          </h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-xl font-bold text-gray-900">Rs. {depositsHeld.toLocaleString()}</div>
+              <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mt-1">Held</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-xl font-bold text-gray-900">Rs. {depositsRefunded.toLocaleString()}</div>
+              <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mt-1">Refunded</div>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <div className="text-xl font-bold text-gray-900">Rs. {depositDeductions.toLocaleString()}</div>
+              <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mt-1">Deducted</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Monthly Revenue Chart */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm lg:col-span-2">
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Monthly Revenue</h3>
+          <div className="h-64 flex items-end gap-2 md:gap-4 justify-between pt-4 border-b border-gray-100">
+            {monthlyRevenue.map((item: any, i: number) => {
+              const maxVal = Math.max(...monthlyRevenue.map((m: any) => m.amount), 1);
+              const heightPercent = `${(item.amount / maxVal) * 100}%`;
+              return (
+                <div key={i} className="flex flex-col items-center flex-1 group">
+                  <div className="relative w-full flex justify-center h-full items-end pb-2">
+                    <div 
+                      className="w-full max-w-[40px] bg-blue-500 rounded-t-md transition-all group-hover:bg-blue-600"
+                      style={{ height: heightPercent }}
+                    />
+                    <div className="absolute -top-8 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none z-10">
+                      Rs. {item.amount.toLocaleString()}
+                    </div>
                   </div>
-                  <span className="text-xs text-gray-500 w-8 text-right">{item.utilization}%</span>
+                  <div className="text-xs font-medium text-gray-500 mt-2">{item.month}</div>
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">{item.bookings} bookings</p>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Top Items Table */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Package className="w-5 h-5 text-gray-500" />
+            Top Performing Items
+          </h3>
+          <div className="space-y-4">
+            {topItems.map((item: any, i: number) => (
+              <div key={i} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg border border-gray-100 transition-colors">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900 text-sm truncate pr-4">{item.name}</div>
+                  <div className="text-xs text-gray-500">{item.bookingCount} bookings</div>
+                </div>
+                <div className="font-bold text-gray-900">
+                  Rs. {item.revenue.toLocaleString()}
+                </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Category Distribution */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Bookings by Category</h2>
-          <div className="space-y-3">
-            {categoryData.map(cat => {
-              const total = categoryData.reduce((a, c) => a + c.value, 0)
-              const pct = Math.round((cat.value / total) * 100)
-              return (
-                <div key={cat.name}>
-                  <div className="flex justify-between items-center mb-1">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                      <p className="text-sm text-gray-700">{cat.name}</p>
-                    </div>
-                    <p className="text-sm font-medium text-gray-900">{cat.value} ({pct}%)</p>
-                  </div>
-                  <div className="bg-gray-100 rounded-full h-2">
-                    <div className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: cat.color }} />
-                  </div>
-                </div>
-              )
-            })}
+            {topItems.length === 0 && (
+              <div className="text-center text-sm text-gray-500 py-8">
+                No item data available
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
