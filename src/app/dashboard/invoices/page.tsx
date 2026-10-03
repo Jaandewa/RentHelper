@@ -54,7 +54,8 @@ export default function InvoicesPage() {
     .map(b => {
       const advanceAmount = b.advanceAmount || 0;
       const totalAmount = b.totalAmount || 0;
-      const balanceDue = Math.max(0, totalAmount - advanceAmount);
+      // Use actual balanceDue from booking record, not recalculated
+      const balanceDue = Math.max(0, b.balanceDue ?? (totalAmount - advanceAmount));
       
       return {
         ...b,
@@ -62,6 +63,7 @@ export default function InvoicesPage() {
         advanceAmount,
         totalAmount,
         balanceDue,
+        customerName: b.customer?.user?.name || b.customer?.name || 'N/A',
         invoiceStatus: getInvoiceStatus(b.paymentStatus, balanceDue)
       };
     })
@@ -71,7 +73,7 @@ export default function InvoicesPage() {
         const searchLower = search.toLowerCase();
         return (
           inv.invoiceNumber.toLowerCase().includes(searchLower) ||
-          (inv.customer?.name || '').toLowerCase().includes(searchLower) ||
+          inv.customerName.toLowerCase().includes(searchLower) ||
           inv.bookingNumber.toLowerCase().includes(searchLower)
         );
       }
@@ -86,8 +88,8 @@ export default function InvoicesPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
-          <p className="text-gray-500">Manage billing and payments for your bookings</p>
+          <h1 className="text-2xl font-bold text-gray-900">Booking Billing</h1>
+          <p className="text-gray-500">Billing summaries for your rental bookings</p>
         </div>
       </div>
 
@@ -170,7 +172,7 @@ export default function InvoicesPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-gray-600">{inv.bookingNumber}</td>
-                      <td className="px-6 py-4 text-gray-900">{inv.customer?.name || 'N/A'}</td>
+                      <td className="px-6 py-4 text-gray-900">{inv.customerName}</td>
                       <td className="px-6 py-4 text-gray-600">
                         {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : 'N/A'}
                       </td>
