@@ -88,6 +88,11 @@ export default function CustomerBookingDetailPage({ params }: { params: Promise<
   const [returnError, setReturnError] = useState('')
   const [settlement, setSettlement] = useState<any>(null)
 
+  // Cancellation states
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
+
   const fetchBooking = async () => {
     try {
       const res = await fetch(`/api/customer/booking-requests/${id}`)
@@ -412,8 +417,57 @@ export default function CustomerBookingDetailPage({ params }: { params: Promise<
                 <span>Balance Due</span>
                 <span>Rs. {(booking.balanceDue || 0).toLocaleString()}</span>
               </div>
+
+              {/* Refund breakdown if cancelled or refunds exist */}
+              {(booking.status === 'cancelled' || (booking.refunds && booking.refunds.length > 0)) && (
+                <>
+                  <div className="h-px bg-gray-200 my-2" />
+                  <div className="flex justify-between text-gray-600">
+                    <span>Rental Paid</span>
+                    <span className="font-medium">Rs. {((booking.payments || []).filter((p: any) => p.type === 'advance' || p.type === 'balance').reduce((a: number, p: any) => a + p.amount, 0)).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-amber-700">
+                    <span>Refund Pending</span>
+                    <span className="font-medium">Rs. {((booking.refunds || []).filter((r: any) => r.status === 'PENDING' || r.status === 'PROCESSING').reduce((a: number, r: any) => a + r.amount, 0)).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-green-700">
+                    <span>Refund Processed</span>
+                    <span className="font-medium">Rs. {((booking.refunds || []).filter((r: any) => r.status === 'PROCESSED').reduce((a: number, r: any) => a + r.amount, 0)).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700 font-medium">
+                    <span>Retained / Non-Refundable</span>
+                    <span>Rs. {Math.max(0, ((booking.payments || []).filter((p: any) => p.type === 'advance' || p.type === 'balance').reduce((a: number, p: any) => a + p.amount, 0)) - ((booking.refunds || []).filter((r: any) => r.status === 'PENDING' || r.status === 'PROCESSING' || r.status === 'PROCESSED').reduce((a: number, r: any) => a + r.amount, 0))).toLocaleString()}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
+
+          {/* Refund Lifecycle Records Panel */}
+          {booking.refunds && booking.refunds.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-3">
+              <h3 className="text-md font-semibold text-gray-900 flex items-center gap-2">
+                <Shield className="w-4 h-4 text-purple-600" /> Refund History
+              </h3>
+              {booking.refunds.map((r: any) => (
+                <div key={r.id} className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-sm space-y-1">
+                  <div className="flex justify-between font-medium">
+                    <span>Rs. {r.amount?.toLocaleString()}</span>
+                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                      r.status === 'PROCESSED' ? 'bg-green-100 text-green-800' :
+                      r.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
+                      r.status === 'PROCESSING' ? 'bg-blue-100 text-blue-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {r.status}
+                    </span>
+                  </div>
+                  {r.referenceId && <p className="text-xs text-gray-500">Ref: {r.referenceId}</p>}
+                  {r.processedAt && <p className="text-xs text-gray-400">Processed: {new Date(r.processedAt).toLocaleDateString()}</p>}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="space-y-2">
@@ -424,9 +478,78 @@ export default function CustomerBookingDetailPage({ params }: { params: Promise<
                 </button>
               </Link>
             )}
+
+            {/* Cancel Booking Button */}
+            {['pending_provider_approval', 'awaiting_advance_payment', 'confirmed'].includes(booking.status) && (
+              <button
+                onClick={() => setShowCancelModal(true)}
+                className="w-full px-4 py-2.5 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+              >
+                Cancel Booking
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Cancellation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900">Cancel Booking #{booking.bookingNumber}?</h3>
+            <p className="text-sm text-gray-600">
+              Cancellation refund percentage depends on notice time before pickup date ({new Date(booking.pickupDate).toLocaleDateString()} {booking.pickupTime || ''}):
+            </p>
+            <ul className="text-xs text-gray-600 space-y-1 list-disc pl-4 bg-gray-50 p-3 rounded-lg">
+              <li>&gt; 48 hours notice: 100% rental payment refund</li>
+              <li>24 - 48 hours notice: 50% rental payment refund</li>
+              <li>&lt; 24 hours notice: Non-refundable (0%)</li>
+            </ul>
+
+            {booking.payments?.some((p: any) => p.type === 'deposit') && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-medium">
+                A security deposit requires separate review.
+              </div>
+            )}
+
+            {cancelError && <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg">{cancelError}</div>}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                disabled={cancelling}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Keep Booking
+              </button>
+              <button
+                onClick={async () => {
+                  setCancelling(true)
+                  setCancelError('')
+                  try {
+                    const res = await fetch(`/api/customer/bookings/${id}/cancel`, { method: 'POST' })
+                    const data = await res.json()
+                    if (res.ok && data.success) {
+                      setShowCancelModal(false)
+                      fetchBooking()
+                    } else {
+                      setCancelError(data.error || 'Failed to cancel booking')
+                    }
+                  } catch {
+                    setCancelError('Network error')
+                  } finally {
+                    setCancelling(false)
+                  }
+                }}
+                disabled={cancelling}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -531,3 +531,169 @@ export async function queueEventNotifications(params: QueueEventParams): Promise
 
   await Promise.allSettled(promises)
 }
+
+// ── Cancellation & Refund Notification Helpers ─────────────────────────────
+
+export async function sendBookingCancelledNotificationToCustomer(
+  bookingId: string,
+  cancellationEventId: string,
+  refundSummaryText: string
+): Promise<void> {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        customer: { include: { user: true } },
+        business: true,
+      },
+    })
+    if (!booking?.customer?.userId) return
+
+    const idempotencyKey = `BOOKING_CANCELLED_CUSTOMER:${bookingId}:${cancellationEventId}`
+
+    await dispatchNotification({
+      userId: booking.customer.userId,
+      eventType: 'PROVIDER_DECISION' as any,
+      subject: `Booking ${booking.bookingNumber} Cancelled`,
+      body: `Your booking #${booking.bookingNumber} has been cancelled. ${refundSummaryText}`,
+      recipientPhone: booking.customer.phone || undefined,
+      relatedEntityId: bookingId,
+      metadata: { bookingNumber: booking.bookingNumber, cancellationEventId, refundSummaryText },
+    })
+
+    await queueNotification({
+      eventType: 'BOOKING_CANCELLED' as any,
+      channel: 'whatsapp',
+      recipientUserId: booking.customer.userId,
+      recipientType: 'CUSTOMER',
+      recipient: booking.customer.phone || '',
+      entityType: 'BOOKING',
+      entityId: bookingId,
+      metadata: { bookingNumber: booking.bookingNumber, cancellationEventId, refundSummaryText },
+    })
+  } catch (e) {
+    console.error('[Notification Service] sendBookingCancelledNotificationToCustomer error:', e)
+  }
+}
+
+export async function sendBookingCancelledNotificationToProvider(
+  bookingId: string,
+  cancellationEventId: string,
+  cancelledByRole: 'CUSTOMER' | 'PROVIDER'
+): Promise<void> {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        business: true,
+        customer: { include: { user: true } },
+      },
+    })
+    if (!booking?.business?.userId) return
+
+    const customerName = booking.customer?.user?.name || 'Customer'
+    const byText = cancelledByRole === 'CUSTOMER' ? `by customer ${customerName}` : 'by your business'
+
+    await dispatchNotification({
+      userId: booking.business.userId,
+      eventType: 'NEW_BOOKING_REQUEST' as any,
+      subject: `Booking ${booking.bookingNumber} Cancelled`,
+      body: `Booking #${booking.bookingNumber} was cancelled ${byText}.`,
+      recipientPhone: booking.business.phone || undefined,
+      relatedEntityId: bookingId,
+      metadata: { bookingNumber: booking.bookingNumber, cancellationEventId, cancelledByRole },
+    })
+
+    if (booking.business.phone) {
+      await queueNotification({
+        eventType: 'BOOKING_CANCELLED' as any,
+        channel: 'whatsapp',
+        recipientUserId: booking.business.userId,
+        recipientType: 'PROVIDER',
+        recipient: booking.business.phone,
+        entityType: 'BOOKING',
+        entityId: bookingId,
+        metadata: { bookingNumber: booking.bookingNumber, cancellationEventId, cancelledByRole },
+      })
+    }
+  } catch (e) {
+    console.error('[Notification Service] sendBookingCancelledNotificationToProvider error:', e)
+  }
+}
+
+export async function sendRefundProcessedNotification(refundId: string): Promise<void> {
+  try {
+    const refund = await prisma.refund.findUnique({
+      where: { id: refundId },
+      include: {
+        booking: {
+          include: {
+            customer: { include: { user: true } },
+            business: true,
+          },
+        },
+      },
+    })
+    if (!refund?.booking?.customer?.userId) return
+
+    const booking = refund.booking
+    const customerUserId = booking.customer.userId
+
+    await dispatchNotification({
+      userId: customerUserId,
+      eventType: 'PAYMENT_CONFIRMATION' as any,
+      subject: `Refund Processed for Booking ${booking.bookingNumber}`,
+      body: `Your refund of LKR ${refund.amount.toLocaleString()} for booking #${booking.bookingNumber} has been processed (${refund.referenceId ? `Ref: ${refund.referenceId}` : 'Recorded'}).`,
+      recipientPhone: booking.customer.phone || undefined,
+      relatedEntityId: refund.id,
+      metadata: { bookingId: booking.id, amount: refund.amount, referenceId: refund.referenceId },
+    })
+
+    if (booking.customer.phone) {
+      await queueNotification({
+        eventType: 'REFUND_PROCESSED' as any,
+        channel: 'whatsapp',
+        recipientUserId: customerUserId,
+        recipientType: 'CUSTOMER',
+        recipient: booking.customer.phone,
+        entityType: 'REFUND',
+        entityId: refund.id,
+        metadata: { bookingNumber: booking.bookingNumber, amount: refund.amount, referenceId: refund.referenceId },
+      })
+    }
+  } catch (e) {
+    console.error('[Notification Service] sendRefundProcessedNotification error:', e)
+  }
+}
+
+export async function sendRefundFailedAlert(
+  refundId: string,
+  attemptNumber: number,
+  reason: string
+): Promise<void> {
+  try {
+    const refund = await prisma.refund.findUnique({
+      where: { id: refundId },
+      include: {
+        booking: {
+          include: { business: true },
+        },
+      },
+    })
+    if (!refund?.booking?.business?.userId) return
+
+    const providerUserId = refund.booking.business.userId
+
+    // Queue internal alert for provider/admin only
+    await dispatchNotification({
+      userId: providerUserId,
+      eventType: 'PAYMENT_CONFIRMATION' as any,
+      subject: `Internal Alert: Refund Recording Failed`,
+      body: `Refund processing failed for booking #${refund.booking.bookingNumber} (Attempt ${attemptNumber}). Reason: ${reason}`,
+      relatedEntityId: refund.id,
+      metadata: { refundId, attemptNumber, reason },
+    })
+  } catch (e) {
+    console.error('[Notification Service] sendRefundFailedAlert error:', e)
+  }
+}

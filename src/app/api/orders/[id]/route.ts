@@ -18,6 +18,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         customer: { include: { user: true } },
         bookingItems: { include: { item: true } },
         payments: true,
+        refunds: true,
         customerRating: true,
         ad: true,
       }

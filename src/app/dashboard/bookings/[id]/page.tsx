@@ -77,6 +77,21 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [inspectionProcessing, setInspectionProcessing] = useState(false)
   const [inspectionError, setInspectionError] = useState('')
 
+  // Cancellation states
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelError, setCancelError] = useState('')
+
+  // Refund payout recording states
+  const [showPayoutModal, setShowPayoutModal] = useState(false)
+  const [selectedRefund, setSelectedRefund] = useState<any>(null)
+  const [payoutMethod, setPayoutMethod] = useState('bank_transfer')
+  const [payoutReference, setPayoutReference] = useState('')
+  const [payoutNotes, setPayoutNotes] = useState('')
+  const [payoutProcessing, setPayoutProcessing] = useState(false)
+  const [payoutError, setPayoutError] = useState('')
+
   const fetchBooking = async () => {
     try {
       const res = await fetch(`/api/orders/${id}`)
@@ -257,7 +272,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Awaiting Advance Payment Status Bar */}
       {booking.status === 'awaiting_advance_payment' && (
-        <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200 shadow-sm">
+        <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <Clock className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
             <div>
@@ -272,12 +287,18 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               )}
             </div>
           </div>
+          <button
+            onClick={() => setShowCancelModal(true)}
+            className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors flex items-center gap-1.5"
+          >
+            <X className="w-4 h-4" /> Cancel Booking
+          </button>
         </div>
       )}
 
       {/* Confirmed Status Bar */}
       {booking.status === 'confirmed' && (
-        <div className="bg-blue-50 p-6 rounded-xl border border-blue-200 shadow-sm">
+        <div className="bg-blue-50 p-6 rounded-xl border border-blue-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <CheckCircle2 className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
@@ -293,6 +314,33 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </button>
             </div>
           </div>
+          <button
+            onClick={() => setShowCancelModal(true)}
+            className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors flex items-center gap-1.5"
+          >
+            <X className="w-4 h-4" /> Cancel Booking
+          </button>
+        </div>
+      )}
+
+      {/* Cancelled Status Bar */}
+      {booking.status === 'cancelled' && (
+        <div className="bg-gray-100 p-6 rounded-xl border border-gray-300 shadow-sm space-y-3">
+          <div className="flex items-start gap-3">
+            <X className="w-5 h-5 text-gray-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Booking Cancelled</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                This booking has been cancelled. Review eligible rental payment refunds and recorded payouts below.
+              </p>
+            </div>
+          </div>
+          {booking.payments?.some((p: any) => p.type === 'deposit') && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span>Deposit collected prior to cancellation — Requires manual review</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -509,6 +557,29 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 <span>Balance Due</span>
                 <span>Rs. {(booking.balanceDue || 0).toLocaleString()}</span>
               </div>
+
+              {/* Refund financial breakdown */}
+              {(booking.status === 'cancelled' || (booking.refunds && booking.refunds.length > 0)) && (
+                <>
+                  <div className="h-px bg-gray-200 my-2" />
+                  <div className="flex justify-between text-gray-600">
+                    <span>Rental Paid</span>
+                    <span className="font-medium">Rs. {((booking.payments || []).filter((p: any) => p.type === 'advance' || p.type === 'balance').reduce((a: number, p: any) => a + p.amount, 0)).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-amber-700">
+                    <span>Refund Pending</span>
+                    <span className="font-medium">Rs. {((booking.refunds || []).filter((r: any) => r.status === 'PENDING' || r.status === 'PROCESSING').reduce((a: number, r: any) => a + r.amount, 0)).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-green-700">
+                    <span>Refund Processed</span>
+                    <span className="font-medium">Rs. {((booking.refunds || []).filter((r: any) => r.status === 'PROCESSED').reduce((a: number, r: any) => a + r.amount, 0)).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700 font-medium">
+                    <span>Retained / Non-Refundable</span>
+                    <span>Rs. {Math.max(0, ((booking.payments || []).filter((p: any) => p.type === 'advance' || p.type === 'balance').reduce((a: number, p: any) => a + p.amount, 0)) - ((booking.refunds || []).filter((r: any) => r.status === 'PENDING' || r.status === 'PROCESSING' || r.status === 'PROCESSED').reduce((a: number, r: any) => a + r.amount, 0))).toLocaleString()}</span>
+                  </div>
+                </>
+              )}
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100">
               <span className={`inline-block px-2.5 py-1 text-xs font-medium rounded-full ${STATUS_STYLES[booking.paymentStatus] || 'bg-gray-100 text-gray-700'}`}>
@@ -516,6 +587,53 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </span>
             </div>
           </div>
+
+          {/* Refund Queue / Management Panel */}
+          {booking.refunds && booking.refunds.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+              <h3 className="text-md font-semibold text-gray-900 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-purple-600" /> Refund Queue & Record Payouts
+              </h3>
+              <div className="space-y-3">
+                {booking.refunds.map((r: any) => (
+                  <div key={r.id} className="p-3.5 bg-gray-50 border border-gray-200 rounded-lg space-y-2 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-gray-900">Rs. {r.amount?.toLocaleString()}</span>
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        r.status === 'PROCESSED' ? 'bg-green-100 text-green-800' :
+                        r.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
+                        r.status === 'PROCESSING' ? 'bg-blue-100 text-blue-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {r.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500">Reason: {r.reasonCode || 'Rental Payment Refund'}</p>
+                    {r.referenceId && (
+                      <p className="text-xs text-gray-600 font-medium">Reference ID: {r.referenceId}</p>
+                    )}
+                    {r.processedAt && (
+                      <p className="text-xs text-gray-400">Processed: {new Date(r.processedAt).toLocaleString()}</p>
+                    )}
+                    {(r.status === 'PENDING' || r.status === 'FAILED') && (
+                      <button
+                        onClick={() => {
+                          setSelectedRefund(r)
+                          setPayoutReference('')
+                          setPayoutNotes('')
+                          setPayoutError('')
+                          setShowPayoutModal(true)
+                        }}
+                        className="mt-2 w-full px-3 py-1.5 bg-purple-600 text-white rounded text-xs font-medium hover:bg-purple-700 transition-colors"
+                      >
+                        Record Payout / Process Refund
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Rate Customer Section */}
           {booking.status === 'completed' && !booking.providerReviewed && !booking.customerRating && !reviewSuccess && (
@@ -929,6 +1047,171 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {inspectionProcessing ? 'Processing...' : 'Complete Return Inspection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Provider Cancellation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900">Cancel Booking #{booking.bookingNumber}?</h3>
+            <p className="text-sm text-gray-600">
+              Provider cancellation will mark this booking as cancelled and entitle the customer to a <strong>100% refund</strong> of all rental payments paid.
+            </p>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Reason for Cancellation (optional)</label>
+              <textarea
+                rows={3}
+                placeholder="Reason for cancelling..."
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+              />
+            </div>
+
+            {cancelError && <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg">{cancelError}</div>}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => { setShowCancelModal(false); setCancelError('') }}
+                disabled={cancelling}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Keep Booking
+              </button>
+              <button
+                onClick={async () => {
+                  setCancelling(true)
+                  setCancelError('')
+                  try {
+                    const res = await fetch(`/api/provider/bookings/${id}/cancel`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ reason: cancelReason.trim() || undefined }),
+                    })
+                    const data = await res.json()
+                    if (res.ok && data.success) {
+                      setShowCancelModal(false)
+                      fetchBooking()
+                      setSuccessMsg('Booking cancelled by provider. Customer notified.')
+                    } else {
+                      setCancelError(data.error || 'Failed to cancel booking')
+                    }
+                  } catch {
+                    setCancelError('Network error')
+                  } finally {
+                    setCancelling(false)
+                  }
+                }}
+                disabled={cancelling}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {cancelling ? 'Cancelling...' : 'Confirm Provider Cancellation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payout Recording Modal */}
+      {showPayoutModal && selectedRefund && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900">
+              Record Payout for Refund (Rs. {selectedRefund.amount?.toLocaleString()})
+            </h3>
+            <p className="text-xs text-gray-500">
+              Approved refund amount is fixed at LKR {selectedRefund.amount?.toLocaleString()}. Please enter the payout transaction reference.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method *</label>
+                <select
+                  value={payoutMethod}
+                  onChange={e => setPayoutMethod(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white"
+                >
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="online">Online Gateway</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Transaction Reference / Receipt ID *</label>
+                <input
+                  type="text"
+                  placeholder="Bank ref, cheque no., or receipt identifier..."
+                  value={payoutReference}
+                  onChange={e => setPayoutReference(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Notes (optional)</label>
+                <input
+                  type="text"
+                  placeholder="Additional payout notes..."
+                  value={payoutNotes}
+                  onChange={e => setPayoutNotes(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
+                />
+              </div>
+            </div>
+
+            {payoutError && <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg">{payoutError}</div>}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => { setShowPayoutModal(false); setPayoutError('') }}
+                disabled={payoutProcessing}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!payoutReference.trim()) {
+                    setPayoutError('Transaction reference / receipt identifier is required.')
+                    return
+                  }
+                  setPayoutProcessing(true)
+                  setPayoutError('')
+                  try {
+                    const res = await fetch(`/api/provider/bookings/${id}/refunds/${selectedRefund.id}/record`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        method: payoutMethod,
+                        referenceId: payoutReference.trim(),
+                        notes: payoutNotes.trim() || undefined,
+                      }),
+                    })
+                    const data = await res.json()
+                    if (res.ok && data.success) {
+                      setShowPayoutModal(false)
+                      fetchBooking()
+                      setSuccessMsg('Refund payout recorded successfully. Customer notified.')
+                    } else {
+                      setPayoutError(data.error || 'Failed to record refund payout')
+                    }
+                  } catch {
+                    setPayoutError('Network error')
+                  } finally {
+                    setPayoutProcessing(false)
+                  }
+                }}
+                disabled={payoutProcessing}
+                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                {payoutProcessing ? 'Recording...' : 'Record Payout'}
               </button>
             </div>
           </div>

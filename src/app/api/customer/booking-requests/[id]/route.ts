@@ -26,6 +26,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         business: true,
         ad: true,
         payments: true,
+        refunds: true,
         providerRating: true,
       }
     })

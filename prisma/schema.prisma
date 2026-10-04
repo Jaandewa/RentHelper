@@ -359,6 +359,7 @@ model Booking {
   ad              RentalAd?        @relation(fields: [adId], references: [id])
   inspections      RentalInspection[]
   depositSettlement DepositSettlement?
+  refunds         Refund[]
 
   @@index([businessId])
   @@index([customerId])
@@ -415,6 +416,7 @@ model Payment {
   paidAt    DateTime @default(now())
 
   booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  refunds   Refund[]
 
   @@index([bookingId])
   @@map("payments")
@@ -783,6 +785,37 @@ model DepositSettlement {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("deposit_settlements")
+}
+
+model Refund {
+  id                  String    @id @default(cuid())
+  bookingId           String
+  originalPaymentId   String
+  amount              Float
+  currency            String    @default("LKR")
+  refundType          String    // RENTAL_PAYMENT
+  status              String    // PENDING, PROCESSING, PROCESSED, FAILED, CANCELLED
+  reasonCode          String?
+  cancellationEventId String?
+  idempotencyKey      String    @unique
+  initiatedByUserId   String?
+  processedByUserId   String?
+  method              String?   // cash, bank_transfer, card, online
+  referenceId         String?   // Transaction or receipt reference
+  failureCode         String?
+  failureReason       String?
+  notes               String?
+  processedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  booking         Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  originalPayment Payment @relation(fields: [originalPaymentId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@index([originalPaymentId])
+  @@index([status])
+  @@map("refunds")
 }
 
 model PasswordResetToken {

@@ -49,6 +49,7 @@ CLAUDE.md
 AGENTS.md
 .agents/
 .env 
+scratch/
 setup-database.bat 
 git-commit.bat 
 git-push.bat 
