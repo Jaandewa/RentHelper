@@ -13,7 +13,15 @@ export async function GET() {
 
   const activeTerms = termsVersions.find((t) => t.isPublished) || null
 
-  return NextResponse.json({ termsVersions, activeTerms })
+  const providerTermsVersions = await prisma.providerTermsVersion.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      business: { select: { id: true, name: true, slug: true } },
+    },
+    take: 50,
+  })
+
+  return NextResponse.json({ termsVersions, activeTerms, providerTermsVersions })
 }
 
 // POST /api/admin/terms — create platform terms version draft
