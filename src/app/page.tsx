@@ -1,147 +1,212 @@
-'use client'
+'use client';
 
-import Link from 'next/link'
-import { Camera, Car, PartyPopper, Wrench, Star, Shield, Users, BarChart3, Calendar, CheckCircle2, ArrowRight, Building2, Laptop, Scissors, Stethoscope, Tent, Home } from 'lucide-react'
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Header from '@/components/layout/Header';
+import { Search, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function LandingPage() {
+export default function MarketplaceHomePage() {
+  const [ads, setAds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [city, setCity] = useState('');
+  const [category, setCategory] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const categories = [
+    { name: 'Camera & Video', slug: 'camera-video' },
+    { name: 'Vehicles', slug: 'vehicles' },
+    { name: 'Party & Events', slug: 'party-events' },
+    { name: 'Tools & Equipment', slug: 'tools-equipment' },
+    { name: 'IT Equipment', slug: 'it-equipment' },
+    { name: 'Sports & Outdoors', slug: 'sports-outdoors' },
+  ];
+  const cities = ['Colombo', 'Kandy', 'Galle', 'Negombo', 'Matara', 'Jaffna', 'Kurunegala'];
+
+  const fetchAds = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (city) params.append('city', city);
+      if (category) params.append('category', category);
+      params.append('page', page.toString());
+
+      const res = await fetch(`/api/marketplace/ads?${params.toString()}`);
+      const data = await res.json();
+      setAds(data.ads || []);
+      setTotalPages(data.pagination?.totalPages || 1);
+    } catch (error) {
+      console.error('Failed to fetch ads', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAds();
+  }, [search, city, category, page]);
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 text-center max-w-5xl mx-auto">
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-gray-900 mb-6">
-          The Complete Rental Management Platform
-        </h1>
-        <p className="text-xl text-gray-600 mb-10 max-w-3xl mx-auto">
-          Manage your rental business with confidence. Cameras, vehicles, party items, tools, and more — all in one place.
-        </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
-          <Link href="/auth/signup?role=provider" className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all shadow-lg hover:shadow-xl">
-            <Building2 className="w-6 h-6" /> I'm a Rental Provider
-          </Link>
-          <Link href="/auth/signup?role=customer" className="flex items-center justify-center gap-2 bg-white border-2 border-gray-200 hover:border-gray-300 text-gray-900 px-8 py-4 rounded-xl text-lg font-semibold transition-all">
-            <Users className="w-6 h-6" /> I'm a Customer
-          </Link>
-        </div>
-        <p className="mt-6 text-sm text-gray-500">
-          Already have an account? <Link href="/auth/signin" className="text-blue-600 font-medium hover:underline">Sign In</Link>
-        </p>
-      </section>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <Header />
 
-      {/* Stats Bar */}
-      <section className="border-y border-gray-100 bg-gray-50 py-10">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          <div>
-            <div className="text-3xl font-bold text-gray-900">500+</div>
-            <div className="text-gray-500 mt-1">Businesses</div>
+      <main className="flex-1 py-8 sm:py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <h1 className="text-3xl font-extrabold text-gray-900 sm:text-5xl tracking-tight">
+              Rent Anything, Anytime.
+            </h1>
+            <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
+              Discover thousands of rental items from trusted providers near you.
+            </p>
           </div>
-          <div>
-            <div className="text-3xl font-bold text-gray-900">10,000+</div>
-            <div className="text-gray-500 mt-1">Items Managed</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold text-gray-900">50,000+</div>
-            <div className="text-gray-500 mt-1">Bookings Completed</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold text-gray-900">4.8★</div>
-            <div className="text-gray-500 mt-1">Average Rating</div>
-          </div>
-        </div>
-      </section>
 
-      {/* Categories Section */}
-      <section className="py-20 px-4 max-w-7xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-12">One Platform for Every Rental Business</h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="p-6 border rounded-2xl bg-white shadow-sm hover:shadow-md transition">
-            <Camera className="w-10 h-10 text-blue-500 mb-4" />
-            <h3 className="text-xl font-bold mb-2">Camera & Video</h3>
-            <p className="text-gray-600">DSLR cameras, lenses, lighting, microphones, gimbals</p>
-          </div>
-          <div className="p-6 border rounded-2xl bg-white shadow-sm hover:shadow-md transition">
-            <Car className="w-10 h-10 text-blue-500 mb-4" />
-            <h3 className="text-xl font-bold mb-2">Vehicles</h3>
-            <p className="text-gray-600">Cars, vans, motorcycles, tuk-tuks, buses</p>
-          </div>
-          <div className="p-6 border rounded-2xl bg-white shadow-sm hover:shadow-md transition">
-            <PartyPopper className="w-10 h-10 text-blue-500 mb-4" />
-            <h3 className="text-xl font-bold mb-2">Party & Events</h3>
-            <p className="text-gray-600">Tents, chairs, sound systems, decorations, stages</p>
-          </div>
-          <div className="p-6 border rounded-2xl bg-white shadow-sm hover:shadow-md transition">
-            <Wrench className="w-10 h-10 text-blue-500 mb-4" />
-            <h3 className="text-xl font-bold mb-2">Tools & Equipment</h3>
-            <p className="text-gray-600">Generators, drills, scaffolding, welding machines</p>
-          </div>
-          <div className="p-6 border rounded-2xl bg-white shadow-sm hover:shadow-md transition">
-            <Scissors className="w-10 h-10 text-blue-500 mb-4" />
-            <h3 className="text-xl font-bold mb-2">Clothing & Bridal</h3>
-            <p className="text-gray-600">Wedding dresses, suits, traditional wear, accessories</p>
-          </div>
-          <div className="p-6 border rounded-2xl bg-white shadow-sm hover:shadow-md transition">
-            <Laptop className="w-10 h-10 text-blue-500 mb-4" />
-            <h3 className="text-xl font-bold mb-2">IT Equipment</h3>
-            <p className="text-gray-600">Laptops, projectors, cameras, WiFi routers, servers</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="bg-gray-900 text-white py-20 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-12 text-center">
-            <div>
-              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Calendar className="w-8 h-8 text-blue-400" />
+          {/* Search and Filters */}
+          <div className="bg-white rounded-2xl shadow-md p-6 mb-8 border border-gray-100">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="What are you looking for?"
+                  className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm transition"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-              <h3 className="text-xl font-bold mb-4">Smart Booking System</h3>
-              <p className="text-gray-400">Real-time availability, double-booking prevention, Google Calendar sync.</p>
+              <div className="w-full md:w-64 relative">
+                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <select
+                  className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white text-sm outline-none transition"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                >
+                  <option value="">All Cities</option>
+                  {cities.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Star className="w-8 h-8 text-blue-400" />
-              </div>
-              <h3 className="text-xl font-bold mb-4">Customer Trust Scores</h3>
-              <p className="text-gray-400">KYC verification, cross-provider ratings, blacklist protection.</p>
-            </div>
-            <div>
-              <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-                <BarChart3 className="w-8 h-8 text-blue-400" />
-              </div>
-              <h3 className="text-xl font-bold mb-4">Analytics & Invoicing</h3>
-              <p className="text-gray-400">PDF invoices, payment tracking, revenue reports.</p>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button
+                onClick={() => setCategory('')}
+                className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
+                  category === '' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Categories
+              </button>
+              {categories.map((c) => (
+                <button
+                  key={c.slug}
+                  onClick={() => setCategory(c.slug)}
+                  className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
+                    category === c.slug ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* How it works */}
-      <section className="py-20 px-4 max-w-5xl mx-auto text-center">
-        <h2 className="text-3xl font-bold mb-12">How It Works</h2>
-        <div className="flex flex-col md:flex-row justify-between items-center gap-8 relative">
-          <div className="flex flex-col items-center flex-1">
-            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xl mb-4">1</div>
-            <h4 className="font-bold">Register</h4>
-          </div>
-          <div className="hidden md:block w-full h-1 bg-gray-200 absolute top-6 -z-10"></div>
-          <div className="flex flex-col items-center flex-1">
-            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xl mb-4">2</div>
-            <h4 className="font-bold">Set up business</h4>
-          </div>
-          <div className="flex flex-col items-center flex-1">
-            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xl mb-4">3</div>
-            <h4 className="font-bold">Add inventory</h4>
-          </div>
-          <div className="flex flex-col items-center flex-1">
-            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xl mb-4">4</div>
-            <h4 className="font-bold">Start earning</h4>
-          </div>
-        </div>
-      </section>
+          {/* Results Grid */}
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="animate-pulse bg-white rounded-2xl shadow-sm h-80 border border-gray-100"></div>
+              ))}
+            </div>
+          ) : ads.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {ads.map((ad: any) => (
+                <Link href={`/marketplace/${ad.id}`} key={ad.id} className="group block">
+                  <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-full">
+                    <div className="relative h-48 bg-gray-100 overflow-hidden">
+                      {ad.coverImageUrl ? (
+                        <img src={ad.coverImageUrl} alt={ad.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">No Image</div>
+                      )}
+                      {ad.isAvailable && (
+                        <span className="absolute top-3 right-3 bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-full font-semibold shadow-sm">
+                          Available
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-5 flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-base font-bold text-gray-900 line-clamp-1 group-hover:text-blue-600 transition-colors">
+                          {ad.title}
+                        </h3>
+                        <div className="flex items-center text-gray-500 text-xs mt-1">
+                          <MapPin className="h-3.5 w-3.5 mr-1 text-gray-400" />
+                          {ad.city || 'Sri Lanka'}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-end mt-4 pt-4 border-t border-gray-50">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">Rate</p>
+                          <p className="text-lg font-extrabold text-gray-900">
+                            LKR {ad.dailyPrice || ad.hourlyPrice || 0}
+                            <span className="text-xs font-normal text-gray-500">/day</span>
+                          </p>
+                        </div>
+                        <div className="flex items-center">
+                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold mr-1.5 overflow-hidden">
+                            {ad.business?.logo ? (
+                              <img src={ad.business.logo} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              ad.business?.name?.[0]?.toUpperCase() || 'P'
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-600 font-medium truncate max-w-[80px]">{ad.business?.name}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">No items found</h3>
+              <p className="mt-1 text-sm text-gray-500">Try adjusting your search query or filters.</p>
+            </div>
+          )}
 
-      <footer className="bg-gray-50 py-10 text-center border-t border-gray-200 text-gray-500">
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-10 flex justify-center items-center space-x-4">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-2.5 rounded-full border border-gray-300 disabled:opacity-40 hover:bg-gray-100 transition"
+              >
+                <ChevronLeft className="h-5 w-5 text-gray-600" />
+              </button>
+              <span className="text-sm font-semibold text-gray-700">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-2.5 rounded-full border border-gray-300 disabled:opacity-40 hover:bg-gray-100 transition"
+              >
+                <ChevronRight className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+
+      <footer className="bg-white border-t border-gray-200 py-8 text-center text-xs text-gray-500">
         <p>© {new Date().getFullYear()} RentHelper. All rights reserved.</p>
       </footer>
     </div>
-  )
+  );
 }
