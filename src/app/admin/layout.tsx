@@ -37,7 +37,7 @@ const navItems = [
   { label: 'All Users', href: '/admin/users', icon: UserCircle },
   { label: 'Marketplace Ads', href: '/admin/marketplace-ads', icon: Store },
   { label: 'Notifications', href: '/admin/settings/notifications', icon: MessageSquare },
-  { label: 'WhatsApp Templates', href: '/admin/settings/whatsapp-templates', icon: FileText },
+  { label: 'Platform Terms', href: '/admin/terms', icon: FileText },
   { label: 'Site Settings', href: '/admin/settings', icon: Settings },
 ]
 
@@ -182,27 +182,209 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       <style jsx global>{`
+        :root {
+          --adm-shell-bg: #f8fafc;
+          --adm-shell-text: #0f172a;
+
+          --adm-sidebar-bg: #ffffff;
+          --adm-sidebar-border: #e2e8f0;
+          --adm-sidebar-brand-border: #f1f5f9;
+          --adm-sidebar-title: #0f172a;
+          --adm-sidebar-sub: #2563eb;
+          --adm-sidebar-badge-bg: #f1f5f9;
+          --adm-sidebar-badge-border: #e2e8f0;
+          --adm-sidebar-badge-name: #0f172a;
+          --adm-sidebar-badge-role: #2563eb;
+          --adm-sidebar-nav-label: #64748b;
+          --adm-sidebar-nav-item: #475569;
+          --adm-sidebar-nav-item-hover-bg: #f1f5f9;
+          --adm-sidebar-nav-item-hover: #0f172a;
+          --adm-sidebar-nav-item-active-bg: #eff6ff;
+          --adm-sidebar-nav-item-active: #2563eb;
+          --adm-sidebar-footer-border: #e2e8f0;
+          --adm-sidebar-footer-link: #64748b;
+          --adm-sidebar-footer-link-hover: #334155;
+          --adm-sidebar-footer-link-hover-bg: #f1f5f9;
+
+          --adm-topbar-bg: rgba(255, 255, 255, 0.95);
+          --adm-topbar-border: #e2e8f0;
+          --adm-topbar-breadcrumb: #64748b;
+          --adm-topbar-breadcrumb-current: #0f172a;
+          --adm-topbar-icon-bg: #f1f5f9;
+          --adm-topbar-icon-border: #e2e8f0;
+          --adm-topbar-icon-color: #475569;
+          --adm-topbar-icon-hover-bg: #e2e8f0;
+          --adm-topbar-icon-hover-color: #0f172a;
+
+          --adm-title: #0f172a;
+          --adm-subtitle: #64748b;
+
+          --adm-card-bg: #ffffff;
+          --adm-card-border: #e2e8f0;
+          --adm-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+          --adm-stat-value: #0f172a;
+          --adm-stat-label: #64748b;
+
+          --adm-table-wrapper-bg: #ffffff;
+          --adm-table-wrapper-border: #e2e8f0;
+          --adm-table-toolbar-border: #f1f5f9;
+          --adm-table-toolbar-title: #0f172a;
+
+          --adm-search-bg: #f1f5f9;
+          --adm-search-border: #e2e8f0;
+          --adm-search-color: #64748b;
+          --adm-search-input: #0f172a;
+          --adm-search-placeholder: #94a3b8;
+
+          --adm-filter-bg: #f1f5f9;
+          --adm-filter-border: #e2e8f0;
+          --adm-filter-color: #475569;
+
+          --adm-th-bg: #f8fafc;
+          --adm-th-border: #e2e8f0;
+          --adm-th-color: #475569;
+          --adm-td-color: #334155;
+          --adm-td-border: #f1f5f9;
+          --adm-tr-hover: #f8fafc;
+
+          --adm-modal-bg: #ffffff;
+          --adm-modal-border: #e2e8f0;
+          --adm-modal-title: #0f172a;
+          --adm-modal-subtitle: #64748b;
+
+          --adm-form-label: #475569;
+          --adm-form-input-bg: #ffffff;
+          --adm-form-input-border: #cbd5e1;
+          --adm-form-input-text: #0f172a;
+
+          --adm-pagination-border: #f1f5f9;
+          --adm-pagination-text: #64748b;
+          --adm-pagination-btn-bg: #f1f5f9;
+          --adm-pagination-btn-border: #e2e8f0;
+          --adm-pagination-btn-color: #475569;
+
+          --adm-user-name: #0f172a;
+          --adm-user-email: #64748b;
+
+          --adm-tabs-bg: #f1f5f9;
+          --adm-tabs-border: #e2e8f0;
+          --adm-tab-color: #64748b;
+        }
+
+        :root.dark, .dark {
+          --adm-shell-bg: #0a0f1e;
+          --adm-shell-text: #f1f5f9;
+
+          --adm-sidebar-bg: linear-gradient(180deg, #0d1426 0%, #0a0f1e 100%);
+          --adm-sidebar-border: rgba(59, 130, 246, 0.1);
+          --adm-sidebar-brand-border: rgba(59, 130, 246, 0.08);
+          --adm-sidebar-title: #f1f5f9;
+          --adm-sidebar-sub: #3B82F6;
+          --adm-sidebar-badge-bg: rgba(59, 130, 246, 0.08);
+          --adm-sidebar-badge-border: rgba(59, 130, 246, 0.12);
+          --adm-sidebar-badge-name: #e2e8f0;
+          --adm-sidebar-badge-role: #3B82F6;
+          --adm-sidebar-nav-label: #475569;
+          --adm-sidebar-nav-item: #94a3b8;
+          --adm-sidebar-nav-item-hover-bg: rgba(59, 130, 246, 0.08);
+          --adm-sidebar-nav-item-hover: #e2e8f0;
+          --adm-sidebar-nav-item-active-bg: rgba(59, 130, 246, 0.15);
+          --adm-sidebar-nav-item-active: #60a5fa;
+          --adm-sidebar-footer-border: rgba(59, 130, 246, 0.08);
+          --adm-sidebar-footer-link: #64748b;
+          --adm-sidebar-footer-link-hover: #94a3b8;
+          --adm-sidebar-footer-link-hover-bg: rgba(255,255,255,0.04);
+
+          --adm-topbar-bg: rgba(10, 15, 30, 0.92);
+          --adm-topbar-border: rgba(59, 130, 246, 0.08);
+          --adm-topbar-breadcrumb: #475569;
+          --adm-topbar-breadcrumb-current: #e2e8f0;
+          --adm-topbar-icon-bg: rgba(255,255,255,0.05);
+          --adm-topbar-icon-border: rgba(255,255,255,0.08);
+          --adm-topbar-icon-color: #64748b;
+          --adm-topbar-icon-hover-bg: rgba(255,255,255,0.08);
+          --adm-topbar-icon-hover-color: #94a3b8;
+
+          --adm-title: #f1f5f9;
+          --adm-subtitle: #64748b;
+
+          --adm-card-bg: rgba(255,255,255,0.03);
+          --adm-card-border: rgba(255,255,255,0.06);
+          --adm-card-shadow: none;
+
+          --adm-stat-value: #f1f5f9;
+          --adm-stat-label: #64748b;
+
+          --adm-table-wrapper-bg: rgba(255,255,255,0.02);
+          --adm-table-wrapper-border: rgba(255,255,255,0.06);
+          --adm-table-toolbar-border: rgba(255,255,255,0.05);
+          --adm-table-toolbar-title: #e2e8f0;
+
+          --adm-search-bg: rgba(255,255,255,0.05);
+          --adm-search-border: rgba(255,255,255,0.08);
+          --adm-search-color: #64748b;
+          --adm-search-input: #e2e8f0;
+          --adm-search-placeholder: #475569;
+
+          --adm-filter-bg: rgba(255,255,255,0.04);
+          --adm-filter-border: rgba(255,255,255,0.08);
+          --adm-filter-color: #94a3b8;
+
+          --adm-th-bg: rgba(255,255,255,0.02);
+          --adm-th-border: rgba(255,255,255,0.05);
+          --adm-th-color: #475569;
+          --adm-td-color: #cbd5e1;
+          --adm-td-border: rgba(255,255,255,0.04);
+          --adm-tr-hover: rgba(255,255,255,0.02);
+
+          --adm-modal-bg: #111827;
+          --adm-modal-border: rgba(255,255,255,0.1);
+          --adm-modal-title: #f1f5f9;
+          --adm-modal-subtitle: #64748b;
+
+          --adm-form-label: #94a3b8;
+          --adm-form-input-bg: rgba(255,255,255,0.05);
+          --adm-form-input-border: rgba(255,255,255,0.1);
+          --adm-form-input-text: #e2e8f0;
+
+          --adm-pagination-border: rgba(255,255,255,0.05);
+          --adm-pagination-text: #64748b;
+          --adm-pagination-btn-bg: rgba(255,255,255,0.04);
+          --adm-pagination-btn-border: rgba(255,255,255,0.08);
+          --adm-pagination-btn-color: #94a3b8;
+
+          --adm-user-name: #e2e8f0;
+          --adm-user-email: #64748b;
+
+          --adm-tabs-bg: rgba(255,255,255,0.03);
+          --adm-tabs-border: rgba(255,255,255,0.06);
+          --adm-tab-color: #64748b;
+        }
+
         /* ===== ADMIN SHELL ===== */
         .admin-shell {
           display: flex;
           min-height: 100vh;
-          background: #0a0f1e;
+          background: var(--adm-shell-bg);
+          color: var(--adm-shell-text);
           font-family: 'Inter', sans-serif;
+          transition: background 0.2s ease, color 0.2s ease;
         }
 
         /* ===== SIDEBAR ===== */
         .admin-sidebar {
           width: 260px;
           min-height: 100vh;
-          background: linear-gradient(180deg, #0d1426 0%, #0a0f1e 100%);
-          border-right: 1px solid rgba(59, 130, 246, 0.1);
+          background: var(--adm-sidebar-bg);
+          border-right: 1px solid var(--adm-sidebar-border);
           display: flex;
           flex-direction: column;
           position: fixed;
           top: 0;
           left: 0;
           z-index: 100;
-          transition: transform 0.3s ease;
+          transition: transform 0.3s ease, background 0.2s ease, border-color 0.2s ease;
         }
 
         .admin-sidebar__brand {
@@ -210,7 +392,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           align-items: center;
           gap: 12px;
           padding: 24px 20px 20px;
-          border-bottom: 1px solid rgba(59, 130, 246, 0.08);
+          border-bottom: 1px solid var(--adm-sidebar-brand-border);
         }
 
         .admin-sidebar__logo {
@@ -228,13 +410,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-sidebar__logo-title {
           font-size: 15px;
           font-weight: 700;
-          color: #f1f5f9;
+          color: var(--adm-sidebar-title);
           margin: 0;
         }
 
         .admin-sidebar__logo-sub {
           font-size: 11px;
-          color: #3B82F6;
+          color: var(--adm-sidebar-sub);
           margin: 0;
           font-weight: 500;
           text-transform: uppercase;
@@ -257,9 +439,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           gap: 10px;
           margin: 16px 16px 8px;
           padding: 12px;
-          background: rgba(59, 130, 246, 0.08);
+          background: var(--adm-sidebar-badge-bg);
           border-radius: 12px;
-          border: 1px solid rgba(59, 130, 246, 0.12);
+          border: 1px solid var(--adm-sidebar-badge-border);
         }
 
         .admin-sidebar__badge-avatar {
@@ -279,7 +461,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-sidebar__badge-name {
           font-size: 13px;
           font-weight: 600;
-          color: #e2e8f0;
+          color: var(--adm-sidebar-badge-name);
           margin: 0;
           white-space: nowrap;
           overflow: hidden;
@@ -288,7 +470,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         .admin-sidebar__badge-role {
           font-size: 11px;
-          color: #3B82F6;
+          color: var(--adm-sidebar-badge-role);
           margin: 0;
           font-weight: 500;
         }
@@ -302,7 +484,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-sidebar__nav-label {
           font-size: 10px;
           font-weight: 700;
-          color: #475569;
+          color: var(--adm-sidebar-nav-label);
           text-transform: uppercase;
           letter-spacing: 0.08em;
           padding: 0 8px;
@@ -315,7 +497,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           gap: 10px;
           padding: 10px 12px;
           border-radius: 10px;
-          color: #94a3b8;
+          color: var(--adm-sidebar-nav-item);
           font-size: 14px;
           font-weight: 500;
           text-decoration: none;
@@ -325,13 +507,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         .admin-sidebar__nav-item:hover {
-          background: rgba(59, 130, 246, 0.08);
-          color: #e2e8f0;
+          background: var(--adm-sidebar-nav-item-hover-bg);
+          color: var(--adm-sidebar-nav-item-hover);
         }
 
         .admin-sidebar__nav-item--active {
-          background: rgba(59, 130, 246, 0.15);
-          color: #60a5fa;
+          background: var(--adm-sidebar-nav-item-active-bg);
+          color: var(--adm-sidebar-nav-item-active);
           font-weight: 600;
         }
 
@@ -354,7 +536,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         .admin-sidebar__footer {
           padding: 16px;
-          border-top: 1px solid rgba(59, 130, 246, 0.08);
+          border-top: 1px solid var(--adm-sidebar-footer-border);
           display: flex;
           flex-direction: column;
           gap: 8px;
@@ -365,15 +547,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           text-align: center;
           padding: 8px;
           font-size: 13px;
-          color: #64748b;
+          color: var(--adm-sidebar-footer-link);
           text-decoration: none;
           border-radius: 8px;
           transition: all 0.15s;
         }
 
         .admin-sidebar__footer-link:hover {
-          color: #94a3b8;
-          background: rgba(255,255,255,0.04);
+          color: var(--adm-sidebar-footer-link-hover);
+          background: var(--adm-sidebar-footer-link-hover-bg);
         }
 
         .admin-sidebar__logout {
@@ -412,9 +594,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           position: sticky;
           top: 0;
           z-index: 50;
-          background: rgba(10, 15, 30, 0.92);
+          background: var(--adm-topbar-bg);
           backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(59, 130, 246, 0.08);
+          border-bottom: 1px solid var(--adm-topbar-border);
           display: flex;
           align-items: center;
           padding: 0 24px;
@@ -443,11 +625,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           align-items: center;
           gap: 6px;
           font-size: 14px;
-          color: #475569;
+          color: var(--adm-topbar-breadcrumb);
         }
 
         .admin-topbar__breadcrumb-current {
-          color: #e2e8f0;
+          color: var(--adm-topbar-breadcrumb-current);
           font-weight: 500;
         }
 
@@ -464,17 +646,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: var(--adm-topbar-icon-bg);
+          border: 1px solid var(--adm-topbar-icon-border);
           border-radius: 10px;
-          color: #64748b;
+          color: var(--adm-topbar-icon-color);
           cursor: pointer;
           transition: all 0.15s;
         }
 
         .admin-topbar__icon-btn:hover {
-          background: rgba(255,255,255,0.08);
-          color: #94a3b8;
+          background: var(--adm-topbar-icon-hover-bg);
+          color: var(--adm-topbar-icon-hover-color);
         }
 
         .admin-topbar__avatar {
@@ -502,7 +684,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #0a0f1e;
+          background: var(--adm-shell-bg);
         }
 
         .admin-spinner {
@@ -558,19 +740,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-page-title {
           font-size: 24px;
           font-weight: 700;
-          color: #f1f5f9;
+          color: var(--adm-title);
           margin: 0 0 4px;
         }
 
         .admin-page-subtitle {
           font-size: 14px;
-          color: #64748b;
+          color: var(--adm-subtitle);
           margin: 0;
         }
 
         .admin-card {
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
+          background: var(--adm-card-bg);
+          border: 1px solid var(--adm-card-border);
+          box-shadow: var(--adm-card-shadow);
           border-radius: 16px;
           padding: 24px;
         }
@@ -583,8 +766,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         .admin-stat-card {
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
+          background: var(--adm-card-bg);
+          border: 1px solid var(--adm-card-border);
+          box-shadow: var(--adm-card-shadow);
           border-radius: 16px;
           padding: 20px;
           position: relative;
@@ -593,7 +777,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         .admin-stat-card:hover {
-          border-color: rgba(59, 130, 246, 0.2);
+          border-color: rgba(59, 130, 246, 0.3);
           transform: translateY(-2px);
         }
 
@@ -610,14 +794,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-stat-card__value {
           font-size: 28px;
           font-weight: 800;
-          color: #f1f5f9;
+          color: var(--adm-stat-value);
           margin: 0 0 4px;
           letter-spacing: -0.02em;
         }
 
         .admin-stat-card__label {
           font-size: 13px;
-          color: #64748b;
+          color: var(--adm-stat-label);
           margin: 0;
         }
 
@@ -633,8 +817,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         .admin-table-wrapper {
-          background: rgba(255,255,255,0.02);
-          border: 1px solid rgba(255,255,255,0.06);
+          background: var(--adm-table-wrapper-bg);
+          border: 1px solid var(--adm-table-wrapper-border);
+          box-shadow: var(--adm-card-shadow);
           border-radius: 16px;
           overflow: hidden;
         }
@@ -644,14 +829,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           align-items: center;
           gap: 12px;
           padding: 16px 20px;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
+          border-bottom: 1px solid var(--adm-table-toolbar-border);
           flex-wrap: wrap;
         }
 
         .admin-table-toolbar__title {
           font-size: 15px;
           font-weight: 600;
-          color: #e2e8f0;
+          color: var(--adm-table-toolbar-title);
           margin: 0;
           flex: 1;
         }
@@ -660,11 +845,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           display: flex;
           align-items: center;
           gap: 8px;
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: var(--adm-search-bg);
+          border: 1px solid var(--adm-search-border);
           border-radius: 10px;
           padding: 8px 12px;
-          color: #64748b;
+          color: var(--adm-search-color);
           width: 240px;
         }
 
@@ -672,13 +857,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           background: none;
           border: none;
           outline: none;
-          color: #e2e8f0;
+          color: var(--adm-search-input);
           font-size: 13px;
           width: 100%;
         }
 
         .admin-search input::placeholder {
-          color: #475569;
+          color: var(--adm-search-placeholder);
         }
 
         .admin-filter-btn {
@@ -686,10 +871,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           align-items: center;
           gap: 6px;
           padding: 8px 14px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: var(--adm-filter-bg);
+          border: 1px solid var(--adm-filter-border);
           border-radius: 10px;
-          color: #94a3b8;
+          color: var(--adm-filter-color);
           font-size: 13px;
           font-weight: 500;
           cursor: pointer;
@@ -700,7 +885,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-filter-btn:hover, .admin-filter-btn--active {
           background: rgba(59, 130, 246, 0.12);
           border-color: rgba(59, 130, 246, 0.25);
-          color: #60a5fa;
+          color: #2563eb;
         }
 
         table.admin-table {
@@ -715,17 +900,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.06em;
-          color: #475569;
-          background: rgba(255,255,255,0.02);
-          border-bottom: 1px solid rgba(255,255,255,0.05);
+          color: var(--adm-th-color);
+          background: var(--adm-th-bg);
+          border-bottom: 1px solid var(--adm-th-border);
           white-space: nowrap;
         }
 
         .admin-table td {
           padding: 14px 16px;
           font-size: 13px;
-          color: #cbd5e1;
-          border-bottom: 1px solid rgba(255,255,255,0.04);
+          color: var(--adm-td-color);
+          border-bottom: 1px solid var(--adm-td-border);
           vertical-align: middle;
         }
 
@@ -734,7 +919,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         .admin-table tr:hover td {
-          background: rgba(255,255,255,0.02);
+          background: var(--adm-tr-hover);
         }
 
         .admin-badge {
@@ -748,15 +933,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           white-space: nowrap;
         }
 
-        .admin-badge--pending   { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
-        .admin-badge--approved  { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
-        .admin-badge--rejected  { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
-        .admin-badge--suspended { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
-        .admin-badge--active    { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
-        .admin-badge--trial     { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.2); }
-        .admin-badge--expired   { background: rgba(100,116,139,0.15); color: #94a3b8; border: 1px solid rgba(100,116,139,0.2); }
-        .admin-badge--verified  { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
-        .admin-badge--banned    { background: rgba(127,29,29,0.3); color: #fca5a5; border: 1px solid rgba(239,68,68,0.2); }
+        .admin-badge--pending   { background: rgba(245,158,11,0.15); color: #d97706; border: 1px solid rgba(245,158,11,0.25); }
+        .admin-badge--approved  { background: rgba(16,185,129,0.15); color: #059669; border: 1px solid rgba(16,185,129,0.25); }
+        .admin-badge--rejected  { background: rgba(239,68,68,0.15);  color: #dc2626; border: 1px solid rgba(239,68,68,0.25); }
+        .admin-badge--suspended { background: rgba(239,68,68,0.15);  color: #dc2626; border: 1px solid rgba(239,68,68,0.25); }
+        .admin-badge--active    { background: rgba(16,185,129,0.15); color: #059669; border: 1px solid rgba(16,185,129,0.25); }
+        .admin-badge--trial     { background: rgba(59,130,246,0.15); color: #2563eb; border: 1px solid rgba(59,130,246,0.25); }
+        .admin-badge--expired   { background: rgba(100,116,139,0.15); color: #64748b; border: 1px solid rgba(100,116,139,0.25); }
+        .admin-badge--verified  { background: rgba(16,185,129,0.15); color: #059669; border: 1px solid rgba(16,185,129,0.25); }
+        .admin-badge--banned    { background: rgba(127,29,29,0.2); color: #dc2626; border: 1px solid rgba(239,68,68,0.25); }
 
         .admin-btn {
           display: inline-flex;
@@ -788,7 +973,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-btn--success {
           background: rgba(16,185,129,0.15);
           border: 1px solid rgba(16,185,129,0.25);
-          color: #34d399;
+          color: #059669;
         }
 
         .admin-btn--success:hover {
@@ -798,7 +983,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-btn--danger {
           background: rgba(239,68,68,0.12);
           border: 1px solid rgba(239,68,68,0.2);
-          color: #f87171;
+          color: #dc2626;
         }
 
         .admin-btn--danger:hover {
@@ -806,14 +991,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         .admin-btn--ghost {
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.08);
-          color: #94a3b8;
+          background: var(--adm-filter-bg);
+          border: 1px solid var(--adm-filter-border);
+          color: var(--adm-filter-color);
         }
 
         .admin-btn--ghost:hover {
-          background: rgba(255,255,255,0.08);
-          color: #e2e8f0;
+          background: rgba(59,130,246,0.12);
+          color: #2563eb;
         }
 
         .admin-btn--sm {
@@ -824,7 +1009,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-modal-overlay {
           position: fixed;
           inset: 0;
-          background: rgba(0,0,0,0.7);
+          background: rgba(0,0,0,0.6);
           backdrop-filter: blur(4px);
           z-index: 200;
           display: flex;
@@ -834,25 +1019,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         .admin-modal {
-          background: #111827;
-          border: 1px solid rgba(255,255,255,0.1);
+          background: var(--adm-modal-bg);
+          border: 1px solid var(--adm-modal-border);
           border-radius: 20px;
           padding: 28px;
           width: 100%;
           max-width: 480px;
-          box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+          box-shadow: 0 25px 60px rgba(0,0,0,0.3);
         }
 
         .admin-modal__title {
           font-size: 18px;
           font-weight: 700;
-          color: #f1f5f9;
+          color: var(--adm-modal-title);
           margin: 0 0 6px;
         }
 
         .admin-modal__subtitle {
           font-size: 13px;
-          color: #64748b;
+          color: var(--adm-modal-subtitle);
           margin: 0 0 24px;
         }
 
@@ -864,7 +1049,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           display: block;
           font-size: 12px;
           font-weight: 600;
-          color: #94a3b8;
+          color: var(--adm-form-label);
           text-transform: uppercase;
           letter-spacing: 0.05em;
           margin-bottom: 6px;
@@ -873,10 +1058,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-form-input, .admin-form-select, .admin-form-textarea {
           width: 100%;
           padding: 10px 14px;
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.1);
+          background: var(--adm-form-input-bg);
+          border: 1px solid var(--adm-form-input-border);
           border-radius: 10px;
-          color: #e2e8f0;
+          color: var(--adm-form-input-text);
           font-size: 14px;
           outline: none;
           transition: border-color 0.15s;
@@ -889,7 +1074,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
 
         .admin-form-select option {
-          background: #1e293b;
+          background: var(--adm-modal-bg);
+          color: var(--adm-form-input-text);
         }
 
         .admin-form-textarea {
@@ -913,7 +1099,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-empty {
           text-align: center;
           padding: 60px 20px;
-          color: #475569;
+          color: var(--adm-subtitle);
         }
 
         .admin-empty-icon {
@@ -926,9 +1112,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           align-items: center;
           justify-content: space-between;
           padding: 14px 20px;
-          border-top: 1px solid rgba(255,255,255,0.05);
+          border-top: 1px solid var(--adm-pagination-border);
           font-size: 13px;
-          color: #64748b;
+          color: var(--adm-pagination-text);
         }
 
         .admin-pagination__btns {
@@ -938,10 +1124,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         .admin-pagination__btn {
           padding: 6px 12px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: var(--adm-pagination-btn-bg);
+          border: 1px solid var(--adm-pagination-btn-border);
           border-radius: 8px;
-          color: #94a3b8;
+          color: var(--adm-pagination-btn-color);
           cursor: pointer;
           font-size: 12px;
           transition: all 0.15s;
@@ -950,7 +1136,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-pagination__btn:hover:not(:disabled) {
           background: rgba(59,130,246,0.12);
           border-color: rgba(59,130,246,0.25);
-          color: #60a5fa;
+          color: #2563eb;
         }
 
         .admin-pagination__btn:disabled {
@@ -981,13 +1167,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .admin-user-cell__name {
           font-size: 14px;
           font-weight: 600;
-          color: #e2e8f0;
+          color: var(--adm-user-name);
           margin: 0;
         }
 
         .admin-user-cell__email {
           font-size: 12px;
-          color: #64748b;
+          color: var(--adm-user-email);
           margin: 0;
         }
 
@@ -995,10 +1181,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           display: flex;
           gap: 4px;
           margin-bottom: 24px;
-          background: rgba(255,255,255,0.03);
+          background: var(--adm-tabs-bg);
           border-radius: 12px;
           padding: 4px;
-          border: 1px solid rgba(255,255,255,0.06);
+          border: 1px solid var(--adm-tabs-border);
         }
 
         .admin-tab {
@@ -1007,7 +1193,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           border-radius: 9px;
           border: none;
           background: none;
-          color: #64748b;
+          color: var(--adm-tab-color);
           font-size: 13px;
           font-weight: 500;
           cursor: pointer;
@@ -1016,7 +1202,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         .admin-tab--active {
           background: rgba(59,130,246,0.15);
-          color: #60a5fa;
+          color: #2563eb;
           font-weight: 600;
         }
 
@@ -1037,7 +1223,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           position: absolute;
           cursor: pointer;
           top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(255,255,255,0.1);
+          background: rgba(100, 116, 139, 0.2);
           border-radius: 24px;
           transition: 0.2s;
         }
