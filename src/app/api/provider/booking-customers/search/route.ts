@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { getCustomerDisplayId } from '@/app/api/provider/customers/route'
 import { normalizeIdentityNumber } from '@/lib/phone'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 function maskPhone(phone: string | null): string {
   if (!phone) return 'N/A'
@@ -20,11 +22,8 @@ function maskEmail(email: string | null): string {
 
 export async function GET(req: Request) {
   try {
-    const session = await auth()
-    
-    if (!session?.user || (session.user.role !== 'provider' && session.user.role !== 'admin')) {
-      return NextResponse.json({ customers: [], error: 'Unauthorized' }, { status: 401 })
-    }
+    const { error } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { searchParams } = new URL(req.url)
     const q = searchParams.get('q')

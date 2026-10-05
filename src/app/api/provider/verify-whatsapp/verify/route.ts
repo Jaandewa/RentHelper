@@ -14,12 +14,12 @@ import { isValidOtp, verifyOtp } from '@/lib/otp'
 const OTP_PURPOSE = 'PROVIDER_LOGIN_WHATSAPP'
 const MAX_ATTEMPTS = 5
 
+import { requireAuthenticatedProviderRecoveryAccess } from '@/lib/provider-guard'
+
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id || (session.user as any).role !== 'provider') {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const { error, user: guardUser, business: guardBusiness } = await requireAuthenticatedProviderRecoveryAccess()
+    if (error) return error
 
     const body = await req.json()
     const { challengeId, otp, sessionToken } = body
@@ -65,12 +65,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify provider owns this phone number
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id },
-      select: { id: true, normalizedPhone: true },
-    })
+    const business = guardBusiness
 
-    if (!business || business.normalizedPhone !== challenge.phoneNumberNormalized) {
+    if (business.normalizedPhone !== challenge.phoneNumberNormalized) {
       return NextResponse.json({ success: false, error: 'Phone number mismatch.' }, { status: 400 })
     }
 

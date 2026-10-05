@@ -1,23 +1,16 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { validateCategoryData, DEFAULT_CATEGORY_CONFIGS } from '@/lib/categoryConfig'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
+
     const { id } = await params
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-    }
-
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id }
-    })
-
-    if (!business) {
-      return NextResponse.json({ message: 'Business not found' }, { status: 404 })
-    }
 
     const item = await prisma.item.findUnique({
       where: { id: id, businessId: business.id },
@@ -41,19 +34,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
+
     const { id } = await params
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-    }
-
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id }
-    })
-
-    if (!business) {
-      return NextResponse.json({ message: 'Business not found' }, { status: 404 })
-    }
 
     const existingItem = await prisma.item.findUnique({
       where: { id: id }
@@ -205,19 +189,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
+
     const { id } = await params
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-    }
-
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id }
-    })
-
-    if (!business) {
-      return NextResponse.json({ message: 'Business not found' }, { status: 404 })
-    }
 
     const item = await prisma.item.findUnique({
       where: { id: id }

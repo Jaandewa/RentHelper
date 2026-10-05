@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { requireAuthenticatedProviderRecoveryAccess } from '@/lib/provider-guard'
 
 const OTP_PURPOSE = 'PROVIDER_CHANGE_WHATSAPP'
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id || (session.user as any).role !== 'provider') {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const { error, user: guardUser, business: guardBusiness } = await requireAuthenticatedProviderRecoveryAccess()
+    if (error) return error
 
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id },
-      select: { id: true },
-    })
+    const business = guardBusiness
 
     if (business) {
-      const userSessionPrefix = `${session.user.id}:${business.id}:`
+      const userSessionPrefix = `${guardUser.id}:${business.id}:`
       await prisma.otpChallenge.updateMany({
         where: {
           purpose: OTP_PURPOSE,

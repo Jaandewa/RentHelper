@@ -1,28 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireVerifiedProviderAccess } from "@/lib/provider-guard";
+
+export const runtime = 'nodejs'
 
 export async function GET(req: Request) {
   try {
-    const session = await auth();
-    if (!session || !session.user || (session.user.role !== "provider" && session.user.role !== "admin")) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
-
-    const business = await prisma.business.findFirst({
-      where: { userId: session.user.id }
-    });
-
-    if (!business) {
-      return NextResponse.json({
-        payments: [],
-        totalIn: 0,
-        totalOut: 0,
-        total: 0,
-        page: 1,
-        limit: 50
-      });
-    }
+    const { error, business } = await requireVerifiedProviderAccess();
+    if (error) return error;
 
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type");

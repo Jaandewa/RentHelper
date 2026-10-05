@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Shield, FileText, CheckCircle, XCircle, AlertCircle, UserX } from 'lucide-react'
+import { ArrowLeft, Shield, FileText, CheckCircle, XCircle, AlertCircle, UserX, Edit2, Save, X } from 'lucide-react'
 
 interface CustomerDetail {
   id: string
@@ -11,6 +11,11 @@ interface CustomerDetail {
   kycStatus: string
   kycRejectionReason: string | null
   trustScore: number
+  address?: string | null
+  city?: string | null
+  emergencyContact?: string | null
+  emergencyPhone?: string | null
+  nationality?: string | null
   createdAt: string
   user: { id: string; name: string; email: string; status: string }
   customerDocuments: Array<{ id: string; type: string; url: string; uploadedAt: string }>
@@ -30,14 +35,59 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const [suspendReason, setSuspendReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // Edit Customer Modal State
+  const [editModal, setEditModal] = useState(false)
+  const [editForm, setEditForm] = useState({
+    name: '', address: '', city: '', emergencyContact: '', emergencyPhone: '', nationality: '', auditReason: ''
+  })
+  const [editError, setEditError] = useState<string | null>(null)
+
   const fetchCustomer = async () => {
     const res = await fetch(`/api/admin/customers/${id}`)
     const data = await res.json()
     setCustomer(data.customer)
+    if (data.customer) {
+      setEditForm({
+        name: data.customer.user?.name || '',
+        address: data.customer.address || '',
+        city: data.customer.city || '',
+        emergencyContact: data.customer.emergencyContact || '',
+        emergencyPhone: data.customer.emergencyPhone || '',
+        nationality: data.customer.nationality || '',
+        auditReason: '',
+      })
+    }
     setLoading(false)
   }
 
   useEffect(() => { fetchCustomer() }, [id])
+
+  const saveEdit = async () => {
+    if (!editForm.auditReason.trim()) {
+      setEditError('Mandatory audit reason is required for administrative profile changes.')
+      return
+    }
+    setSubmitting(true)
+    setEditError(null)
+    try {
+      const res = await fetch(`/api/admin/customers/${id}/edit`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setEditError(data.message || 'Failed to update customer profile')
+        return
+      }
+      setEditModal(false)
+      fetchCustomer()
+    } catch {
+      setEditError('Network error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const doKyc = async () => {
     setSubmitting(true)
@@ -92,6 +142,9 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           <p className="admin-page-subtitle">{customer.user.email} · Joined {fmt(customer.createdAt)}</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="admin-btn admin-btn--ghost" onClick={() => setEditModal(true)}>
+            <Edit2 size={15} /> Edit Details
+          </button>
           {customer.kycStatus === 'pending' && (
             <>
               <button className="admin-btn admin-btn--success" onClick={() => setKycModal('verified')}>
@@ -241,6 +294,75 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               <button className="admin-btn admin-btn--ghost" onClick={() => setSuspendModal(false)}>Cancel</button>
               <button className="admin-btn admin-btn--danger" onClick={doSuspend} disabled={submitting || !suspendReason}>
                 {submitting ? 'Saving...' : 'Suspend'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Customer Profile Modal */}
+      {editModal && (
+        <div className="admin-modal-overlay" onClick={() => setEditModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+            <h3 className="admin-modal__title">Edit Customer Profile</h3>
+            <p className="admin-modal__subtitle">Administrative profile updates with mandatory audit logging.</p>
+
+            <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', fontSize: '11px', color: '#1e40af' }}>
+              ℹ️ Phone numbers, email addresses, and identity document numbers cannot be altered directly here. Re-verification via secure OTP or support ticket recovery is required.
+            </div>
+
+            {editError && (
+              <div style={{ padding: '10px', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: '6px', marginBottom: '12px', fontSize: '12px' }}>
+                {editError}
+              </div>
+            )}
+
+            <div className="admin-form-group">
+              <label className="admin-form-label">Customer Name</label>
+              <input className="admin-form-input" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+
+            <div className="admin-form-row">
+              <div className="admin-form-group">
+                <label className="admin-form-label">Address</label>
+                <input className="admin-form-input" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
+              </div>
+              <div className="admin-form-group">
+                <label className="admin-form-label">City</label>
+                <input className="admin-form-input" value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="admin-form-row">
+              <div className="admin-form-group">
+                <label className="admin-form-label">Emergency Contact Name</label>
+                <input className="admin-form-input" value={editForm.emergencyContact} onChange={e => setEditForm(f => ({ ...f, emergencyContact: e.target.value }))} />
+              </div>
+              <div className="admin-form-group">
+                <label className="admin-form-label">Emergency Contact Phone</label>
+                <input className="admin-form-input" value={editForm.emergencyPhone} onChange={e => setEditForm(f => ({ ...f, emergencyPhone: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="admin-form-group">
+              <label className="admin-form-label">Nationality</label>
+              <input className="admin-form-input" value={editForm.nationality} onChange={e => setEditForm(f => ({ ...f, nationality: e.target.value }))} placeholder="e.g. Sri Lankan, British, etc." />
+            </div>
+
+            <div className="admin-form-group" style={{ backgroundColor: '#fffbeb', padding: '12px', borderRadius: '8px', border: '1px solid #fef08a' }}>
+              <label className="admin-form-label" style={{ color: '#92400e', fontWeight: 600 }}>Mandatory Audit Reason *</label>
+              <input
+                className="admin-form-input"
+                placeholder="Reason for change (e.g. Typo correction in name per customer request)"
+                value={editForm.auditReason}
+                onChange={e => setEditForm(f => ({ ...f, auditReason: e.target.value }))}
+              />
+            </div>
+
+            <div className="admin-modal__actions">
+              <button className="admin-btn admin-btn--ghost" onClick={() => setEditModal(false)}><X size={14} /> Cancel</button>
+              <button className="admin-btn admin-btn--primary" onClick={saveEdit} disabled={submitting}>
+                <Save size={14} /> {submitting ? 'Saving...' : 'Save Profile Changes'}
               </button>
             </div>
           </div>

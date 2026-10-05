@@ -21,25 +21,17 @@ const OTP_EXPIRY_MINUTES = 5
 const RESEND_COOLDOWN_SECONDS = 60
 const MAX_SENDS_PER_PHONE_15MIN = 3
 
+import { requireAuthenticatedProviderRecoveryAccess } from '@/lib/provider-guard'
+
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id || (session.user as any).role !== 'provider') {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const { error, user: guardUser, business: guardBusiness } = await requireAuthenticatedProviderRecoveryAccess()
+    if (error) return error
 
-    const body = await req.json()
+    const body = await req.json().catch(() => ({}))
     const { sessionToken: clientSessionToken } = body
 
-    // Load provider's business to get the registered phone
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id },
-      select: { id: true, normalizedPhone: true, phone: true, phoneVerified: true },
-    })
-
-    if (!business) {
-      return NextResponse.json({ success: false, error: 'Business profile not found.' }, { status: 404 })
-    }
+    const business = guardBusiness
 
     // Already verified — no need to send OTP
     if (business.phoneVerified) {

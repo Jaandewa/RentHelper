@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { maskPhoneForDisplay } from '@/lib/phone'
 import { generateOtp, hashOtp } from '@/lib/otp'
 import { sendRegistrationOtpWhatsApp } from '@/lib/notifications/whatsapp'
+import { requireAuthenticatedProviderRecoveryAccess } from '@/lib/provider-guard'
 
 const OTP_PURPOSE = 'PROVIDER_CHANGE_WHATSAPP'
 const OTP_EXPIRY_MINUTES = 5
@@ -12,10 +12,8 @@ const MAX_SENDS_PER_15MIN = 3
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id || (session.user as any).role !== 'provider') {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const { error, user: guardUser, business: guardBusiness } = await requireAuthenticatedProviderRecoveryAccess()
+    if (error) return error
 
     const body = await req.json().catch(() => ({}))
     const { challengeId, sessionToken } = body
@@ -24,16 +22,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Invalid change session.' }, { status: 400 })
     }
 
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id },
-      select: { id: true, name: true },
-    })
+    const business = guardBusiness
 
-    if (!business) {
-      return NextResponse.json({ ok: false, error: 'Business profile not found.' }, { status: 404 })
-    }
-
-    const expectedPrefix = `${session.user.id}:${business.id}:`
+    const expectedPrefix = `${guardUser.id}:${business.id}:`
     if (!sessionToken.startsWith(expectedPrefix)) {
       return NextResponse.json({ ok: false, error: 'Invalid session binding.' }, { status: 400 })
     }

@@ -1,14 +1,15 @@
-import { auth } from '@/lib/auth'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { queueEventNotifications } from '@/lib/notifications/service'
-// Assuming this module exists as per prompt instructions
 import { VALID_DEDUCTION_CODES } from '@/lib/deposit-deduction-reasons'
+
+export const runtime = 'nodejs'
 
 export async function POST(req: Request, { params }: { params: Promise<{ bookingId: string }> }) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { error, user, business } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { bookingId } = await params
 
@@ -23,7 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ booking
 
     if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 
-    if (booking.business.userId !== session.user.id) {
+    if (booking.businessId !== business.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -99,7 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ booking
           type: 'RETURN',
           conditionStatus,
           notes,
-          performedByUserId: session.user.id,
+          performedByUserId: user.id,
           media: photoUrls && photoUrls.length > 0 ? {
             create: photoUrls.map((url: string) => ({ url }))
           } : undefined
@@ -118,7 +119,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ booking
           settlementStatus,
           settlementMethod,
           refundReference: refundReference || undefined,
-          processedByUserId: session.user.id,
+          processedByUserId: user.id,
         }
       })
 

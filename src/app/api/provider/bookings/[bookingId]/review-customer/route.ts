@@ -1,20 +1,20 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import { submitCustomerRating } from '@/lib/reviews/service'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 export async function POST(req: Request, { params }: { params: Promise<{ bookingId: string }> }) {
   try {
-    const session = await auth()
-    if (!session?.user?.id || session.user.role !== 'provider') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { error, user } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { bookingId } = await params
     const body = await req.json()
     const { rating, reviewText } = body
 
     const result = await submitCustomerRating({
-      userId: session.user.id,
+      userId: user.id,
       bookingId,
       overallScore: rating,
       reviewText,

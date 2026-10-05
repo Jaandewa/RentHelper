@@ -83,6 +83,28 @@ export async function POST(req: Request) {
 
     const bookingNumber = generateBookingNumber()
 
+    // Resolve active platform & provider terms versions server-side
+    const activePlatformTerms = await prisma.platformTermsVersion.findFirst({
+      where: { isPublished: true },
+      select: { version: true },
+    })
+
+    // Platform terms are mandatory for platform operation
+    if (!activePlatformTerms) {
+      return NextResponse.json(
+        { error: 'Platform terms and conditions are currently unavailable. Please contact support.' },
+        { status: 422 }
+      )
+    }
+
+    const activeProviderTerms = await prisma.providerTermsVersion.findFirst({
+      where: { businessId: ad.businessId, isPublished: true },
+      select: { version: true },
+    })
+
+    const platformVer = activePlatformTerms.version
+    const providerVer = activeProviderTerms?.version || null
+
     const booking = await prisma.booking.create({
       data: {
         businessId: ad.businessId,
@@ -112,7 +134,9 @@ export async function POST(req: Request) {
         categorySpecificData: categorySpecificData || null,
         agreementAccepted: true,
         agreementAcceptedAt: new Date(),
-        agreementVersion: '1.0',
+        agreementVersion: `${platformVer}/${providerVer}`,
+        platformAgreementVersion: platformVer,
+        providerAgreementVersion: providerVer,
         // Price snapshots
         dailyRateSnapshot: ad.dailyPrice || ad.item.dailyRate,
         weeklyRateSnapshot: ad.weeklyPrice || ad.item.weeklyRate,

@@ -1,25 +1,18 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard';
+
+export const runtime = 'nodejs'
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session || session.user.role !== 'provider') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { error, business } = await requireVerifiedProviderAccess();
+    if (error) return error;
 
     const { id } = await params;
-    const business = await prisma.business.findFirst({
-      where: { userId: session.user.id },
-    });
-
-    if (!business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
-    }
 
     const ad = await prisma.rentalAd.findFirst({
       where: { id, businessId: business.id },

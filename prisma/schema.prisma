@@ -19,6 +19,7 @@ model User {
   status          String    @default("active") // active, suspended, banned
   suspendedUntil  DateTime?
   suspendReason   String?
+  themePreference String    @default("system") // light, dark, system
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   passwordChangedAt  DateTime?
@@ -30,6 +31,11 @@ model User {
   activityLogs    ActivityLog[]
   addedBlacklists BlacklistEntry[]
   passwordResetTokens PasswordResetToken[]
+  providerTermsVersions ProviderTermsVersion[]
+  platformTermsVersions PlatformTermsVersion[]
+  supportTickets        SupportTicket[]
+  supportTicketMessages SupportTicketMessage[]
+  verificationExceptions VerificationException[]
 
   @@map("users")
 }
@@ -114,6 +120,7 @@ model Business {
   customerRatings     CustomerRating[]
   subscription        Subscription?
   rentalAds           RentalAd[]
+  providerTermsVersions ProviderTermsVersion[]
 
   @@index([slug])
   @@index([approvalStatus])
@@ -317,9 +324,11 @@ model Booking {
   returnTime            String?   // e.g. "17:00"
   
   // Agreement tracking
-  agreementAccepted     Boolean   @default(false)
-  agreementAcceptedAt   DateTime?
-  agreementVersion      String?
+  agreementAccepted          Boolean   @default(false)
+  agreementAcceptedAt        DateTime?
+  agreementVersion           String?   // Legacy version string (kept for backwards compatibility)
+  platformAgreementVersion   String?   // Accepted platform terms version (e.g. "v1.0")
+  providerAgreementVersion   String?   // Accepted provider terms version (e.g. "v2.1")
   
   // Price snapshots from the ad at time of request
   hourlyRateSnapshot    Float?
@@ -581,6 +590,8 @@ model SiteSettings {
   googleClientSecret    String?
   emailFromName         String   @default("RentHelper")
   emailFromAddress      String   @default("noreply@renthelper.lk")
+  supportEmail          String?  @default("support@renthelper.lk")
+  securityEmail         String?  @default("security@renthelper.lk")
   smtpHost              String?
   smtpPort              Int      @default(587)
   smtpUser              String?
@@ -847,4 +858,107 @@ model PasswordRecoveryRequest {
   @@index([identifierHash])
   @@index([sessionToken])
   @@map("password_recovery_requests")
+}
+
+// ── Provider Terms & Conditions Versioning ────────────────────────────
+
+model ProviderTermsVersion {
+  id          String   @id @default(cuid())
+  businessId  String
+  version     String   // e.g. "v1.0", "v1.1"
+  title       String   @default("Standard Rental Agreement & Policy")
+  content     String
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [createdBy], references: [id])
+
+  @@index([businessId, isPublished])
+  @@map("provider_terms_versions")
+}
+
+// ── Platform Terms & Conditions Versioning (Admin Managed) ────────────
+
+model PlatformTermsVersion {
+  id          String   @id @default(cuid())
+  version     String   @unique // e.g. "v1.0"
+  title       String   @default("Platform Terms of Service")
+  content     String
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [createdBy], references: [id])
+
+  @@map("platform_terms_versions")
+}
+
+// ── Support Tickets & Ticket Messages ─────────────────────────────────
+
+model SupportTicket {
+  id            String   @id @default(cuid())
+  ticketNumber  String   @unique // e.g. TCK-2026-1001
+  userId        String?  // Optional for unauthenticated callers
+  guestName     String?
+  guestEmail    String?
+  guestPhone    String?
+  category      String   // WHATSAPP_VERIFICATION_HELP, LOGIN_BLOCKED, KYC_HELP, GENERAL_INQUIRY
+  subject       String
+  description   String
+  status        String   @default("OPEN") // OPEN, IN_PROGRESS, WAITING_USER, RESOLVED, CLOSED
+  priority      String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  sourcePage    String?  // e.g. /provider/verify-whatsapp
+  ipAddress     String?
+  assignedTo    String?  // Admin User ID
+  resolvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages      SupportTicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id          String   @id @default(cuid())
+  ticketId    String
+  senderId    String?  // User ID (Admin or User), null for guest
+  senderType  String   // USER, ADMIN, GUEST, SYSTEM
+  message     String
+  isInternal  Boolean  @default(false) // Admin internal notes
+  createdAt   DateTime @default(now())
+
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender      User?         @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@map("support_ticket_messages")
+}
+
+// ── Verification Exceptions (Temporary Admin Overrides) ───────────────
+
+model VerificationException {
+  id            String   @id @default(cuid())
+  userId        String
+  targetType    String   // CUSTOMER_PHONE, PROVIDER_PHONE, LOGIN_RECOVERY
+  reason        String
+  exceptionType String   // PHONE_VERIFICATION_BYPASS, TEMPORARY_LOGIN_BYPASS
+  grantedBy     String   // Admin User ID
+  expiresAt     DateTime
+  isActive      Boolean  @default(true)
+  usedAt        DateTime?
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, targetType, isActive])
+  @@map("verification_exceptions")
 }

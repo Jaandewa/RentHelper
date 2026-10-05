@@ -1,26 +1,13 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { auth } from '@/lib/auth'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 export async function GET(req: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const role = session.user.role?.toLowerCase()
-    if (role !== 'provider' && role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    const business = await prisma.business.findFirst({
-      where: { userId: session.user.id },
-    })
-
-    if (!business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const ads = await prisma.rentalAd.findMany({
       where: { businessId: business.id },
@@ -39,23 +26,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-    }
-
-    const role = session.user.role?.toLowerCase()
-    if (role !== 'provider' && role !== 'admin') {
-      return NextResponse.json({ message: 'Forbidden — Providers only' }, { status: 403 })
-    }
-
-    const business = await prisma.business.findFirst({
-      where: { userId: session.user.id },
-    })
-
-    if (!business) {
-      return NextResponse.json({ message: 'Business profile not found' }, { status: 404 })
-    }
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const body = await req.json()
     const { 

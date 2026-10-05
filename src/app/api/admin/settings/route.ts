@@ -33,6 +33,21 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
 
+  // Validate and normalize support & security emails if provided
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (body.supportEmail) {
+    body.supportEmail = body.supportEmail.trim().toLowerCase()
+    if (!emailRegex.test(body.supportEmail)) {
+      return NextResponse.json({ message: 'Invalid Support Email address format' }, { status: 400 })
+    }
+  }
+  if (body.securityEmail) {
+    body.securityEmail = body.securityEmail.trim().toLowerCase()
+    if (!emailRegex.test(body.securityEmail)) {
+      return NextResponse.json({ message: 'Invalid Security Notification Email address format' }, { status: 400 })
+    }
+  }
+
   // Don't overwrite masked values if unchanged
   if (body.googleClientSecret === '••••••••') delete body.googleClientSecret
   if (body.smtpPass === '••••••••') delete body.smtpPass
@@ -41,6 +56,17 @@ export async function PATCH(req: NextRequest) {
     where: { id: '1' },
     create: { id: '1', ...body, updatedBy: session!.user.id },
     update: { ...body, updatedBy: session!.user.id },
+  })
+
+  // Audit configuration change
+  await prisma.activityLog.create({
+    data: {
+      userId: session!.user.id,
+      action: 'UPDATE_SITE_SETTINGS',
+      entityType: 'SITE_SETTINGS',
+      entityId: '1',
+      details: JSON.stringify({ updatedFields: Object.keys(body) }),
+    },
   })
 
   return NextResponse.json({ settings, message: 'Settings saved' })

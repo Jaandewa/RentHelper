@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   ArrowLeft, Building2, Mail, Phone, MapPin, Calendar,
   CreditCard, Package, BookOpen, CheckCircle, XCircle,
-  Pause, Play, Edit2, Save, X
+  Pause, Play, Edit2, Save, X, ShieldCheck
 } from 'lucide-react'
 
 interface ProviderDetail {
@@ -44,10 +44,35 @@ export default function ProviderDetailPage({ params }: { params: Promise<{ id: s
     maxItems: 50, trialEndsAt: '', currentPeriodEnd: '', notes: '',
   })
 
+  // Edit Business Profile Modal State
+  const [editModal, setEditModal] = useState(false)
+  const [editForm, setEditForm] = useState({
+    name: '', address: '', city: '', description: '', advancePaymentPercent: 30, auditReason: ''
+  })
+  const [editError, setEditError] = useState<string | null>(null)
+
+  // Verification Exception Modal State
+  const [exceptionModal, setExceptionModal] = useState(false)
+  const [exceptionForm, setExceptionForm] = useState({
+    targetType: 'PROVIDER_PHONE', reason: '', durationHours: '24'
+  })
+  const [exceptionError, setExceptionError] = useState<string | null>(null)
+  const [exceptionSuccess, setExceptionSuccess] = useState<string | null>(null)
+
   const fetchProvider = async () => {
     const res = await fetch(`/api/admin/providers/${id}`)
     const data = await res.json()
     setProvider(data.business)
+    if (data.business) {
+      setEditForm({
+        name: data.business.name || '',
+        address: data.business.address || '',
+        city: data.business.city || '',
+        description: data.business.description || '',
+        advancePaymentPercent: data.business.advancePaymentPercent || 30,
+        auditReason: '',
+      })
+    }
     if (data.business?.subscription) {
       const s = data.business.subscription
       setSubForm({
@@ -59,6 +84,71 @@ export default function ProviderDetailPage({ params }: { params: Promise<{ id: s
       })
     }
     setLoading(false)
+  }
+
+  const saveEdit = async () => {
+    if (!editForm.auditReason.trim()) {
+      setEditError('Mandatory audit reason is required for administrative changes.')
+      return
+    }
+    setSubmitting(true)
+    setEditError(null)
+    try {
+      const res = await fetch(`/api/admin/providers/${id}/edit`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setEditError(data.message || 'Failed to update business profile')
+        return
+      }
+      setEditModal(false)
+      fetchProvider()
+    } catch {
+      setEditError('Network error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const saveException = async () => {
+    if (!provider?.user?.id) return
+    if (!exceptionForm.reason.trim()) {
+      setExceptionError('Mandatory reason is required.')
+      return
+    }
+    setSubmitting(true)
+    setExceptionError(null)
+    setExceptionSuccess(null)
+    try {
+      const res = await fetch('/api/admin/verification-exceptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: provider.user.id,
+          targetType: exceptionForm.targetType,
+          exceptionType: 'PHONE_VERIFICATION_BYPASS',
+          reason: exceptionForm.reason.trim(),
+          durationHours: Number(exceptionForm.durationHours),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setExceptionError(data.message || 'Failed to grant exception')
+        return
+      }
+      setExceptionSuccess(data.message)
+      setTimeout(() => {
+        setExceptionModal(false)
+        setExceptionSuccess(null)
+      }, 1500)
+    } catch {
+      setExceptionError('Network error')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   useEffect(() => { fetchProvider() }, [id])
@@ -109,6 +199,12 @@ export default function ProviderDetailPage({ params }: { params: Promise<{ id: s
         </div>
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button className="admin-btn admin-btn--ghost" onClick={() => setEditModal(true)}>
+            <Edit2 size={15} /> Edit Business
+          </button>
+          <button className="admin-btn admin-btn--warning" onClick={() => setExceptionModal(true)}>
+            <ShieldCheck size={15} /> Grant Exception
+          </button>
           {provider.approvalStatus === 'pending' && (
             <>
               <button className="admin-btn admin-btn--success" onClick={() => setActionModal('approve')}>
@@ -312,6 +408,129 @@ export default function ProviderDetailPage({ params }: { params: Promise<{ id: s
               <button className="admin-btn admin-btn--ghost" onClick={() => setSubModal(false)}><X size={14} /> Cancel</button>
               <button className="admin-btn admin-btn--primary" onClick={saveSubscription} disabled={submitting}>
                 <Save size={14} /> {submitting ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Business Profile Modal */}
+      {editModal && (
+        <div className="admin-modal-overlay" onClick={() => setEditModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+            <h3 className="admin-modal__title">Edit Business Profile</h3>
+            <p className="admin-modal__subtitle">Administrative updates with mandatory audit logging.</p>
+
+            {editError && (
+              <div style={{ padding: '10px', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: '6px', marginBottom: '12px', fontSize: '12px' }}>
+                {editError}
+              </div>
+            )}
+
+            <div className="admin-form-group">
+              <label className="admin-form-label">Business Name</label>
+              <input className="admin-form-input" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+
+            <div className="admin-form-row">
+              <div className="admin-form-group">
+                <label className="admin-form-label">Address</label>
+                <input className="admin-form-input" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
+              </div>
+              <div className="admin-form-group">
+                <label className="admin-form-label">City</label>
+                <input className="admin-form-input" value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="admin-form-group">
+              <label className="admin-form-label">Advance Payment %</label>
+              <input className="admin-form-input" type="number" value={editForm.advancePaymentPercent} onChange={e => setEditForm(f => ({ ...f, advancePaymentPercent: Number(e.target.value) }))} />
+            </div>
+
+            <div className="admin-form-group">
+              <label className="admin-form-label">Business Description</label>
+              <textarea className="admin-form-textarea" rows={3} value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+
+            <div className="admin-form-group" style={{ backgroundColor: '#fffbeb', padding: '12px', borderRadius: '8px', border: '1px solid #fef08a' }}>
+              <label className="admin-form-label" style={{ color: '#92400e', fontWeight: 600 }}>Mandatory Audit Reason *</label>
+              <input
+                className="admin-form-input"
+                placeholder="Reason for change (e.g. Corrected business name per owner request)"
+                value={editForm.auditReason}
+                onChange={e => setEditForm(f => ({ ...f, auditReason: e.target.value }))}
+              />
+            </div>
+
+            <div className="admin-modal__actions">
+              <button className="admin-btn admin-btn--ghost" onClick={() => setEditModal(false)}><X size={14} /> Cancel</button>
+              <button className="admin-btn admin-btn--primary" onClick={saveEdit} disabled={submitting}>
+                <Save size={14} /> {submitting ? 'Saving...' : 'Save Profile Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Grant Verification Exception Modal */}
+      {exceptionModal && (
+        <div className="admin-modal-overlay" onClick={() => setExceptionModal(false)}>
+          <div className="admin-modal" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+            <h3 className="admin-modal__title">Grant Verification Exception</h3>
+            <p className="admin-modal__subtitle">Grant time-limited bypass for provider phone verification.</p>
+
+            {exceptionError && (
+              <div style={{ padding: '10px', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: '6px', marginBottom: '12px', fontSize: '12px' }}>
+                {exceptionError}
+              </div>
+            )}
+
+            {exceptionSuccess && (
+              <div style={{ padding: '10px', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '6px', marginBottom: '12px', fontSize: '12px' }}>
+                {exceptionSuccess}
+              </div>
+            )}
+
+            <div className="admin-form-group">
+              <label className="admin-form-label">Target Exception Scope</label>
+              <select
+                className="admin-form-select"
+                value={exceptionForm.targetType}
+                onChange={e => setExceptionForm(f => ({ ...f, targetType: e.target.value }))}
+              >
+                <option value="PROVIDER_PHONE">Provider Phone Verification Bypass</option>
+              </select>
+            </div>
+
+            <div className="admin-form-group">
+              <label className="admin-form-label">Duration</label>
+              <select
+                className="admin-form-select"
+                value={exceptionForm.durationHours}
+                onChange={e => setExceptionForm(f => ({ ...f, durationHours: e.target.value }))}
+              >
+                <option value="24">24 Hours (1 Day)</option>
+                <option value="48">48 Hours (2 Days)</option>
+                <option value="168">168 Hours (7 Days)</option>
+              </select>
+            </div>
+
+            <div className="admin-form-group" style={{ backgroundColor: '#fffbeb', padding: '12px', borderRadius: '8px', border: '1px solid #fef08a' }}>
+              <label className="admin-form-label" style={{ color: '#92400e', fontWeight: 600 }}>Mandatory Justification / Reason *</label>
+              <textarea
+                className="admin-form-textarea"
+                rows={3}
+                placeholder="Reason for granting exception (e.g. WhatsApp API delivery failure for international provider phone)"
+                value={exceptionForm.reason}
+                onChange={e => setExceptionForm(f => ({ ...f, reason: e.target.value }))}
+              />
+            </div>
+
+            <div className="admin-modal__actions">
+              <button className="admin-btn admin-btn--ghost" onClick={() => setExceptionModal(false)}><X size={14} /> Cancel</button>
+              <button className="admin-btn admin-btn--warning" onClick={saveException} disabled={submitting}>
+                <ShieldCheck size={14} /> {submitting ? 'Granting...' : 'Grant Exception'}
               </button>
             </div>
           </div>

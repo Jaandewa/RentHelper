@@ -1,30 +1,22 @@
 import { NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { calculateRefundSummary } from '@/lib/booking/cancellation'
 import {
   sendBookingCancelledNotificationToCustomer,
   sendBookingCancelledNotificationToProvider,
 } from '@/lib/notifications/service'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ bookingId: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const providerBusiness = await prisma.business.findUnique({
-      where: { userId: session.user.id },
-    })
-
-    if (!providerBusiness) {
-      return NextResponse.json({ error: 'Provider business profile not found' }, { status: 403 })
-    }
+    const { error, user, business: providerBusiness } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { bookingId } = await params
 
@@ -120,7 +112,7 @@ export async function POST(
               reasonCode: summary.policy.reasonCode,
               cancellationEventId,
               idempotencyKey,
-              initiatedByUserId: session.user.id,
+              initiatedByUserId: user.id,
             },
           })
 
@@ -131,7 +123,7 @@ export async function POST(
       // Record ActivityLog audit event
       await tx.activityLog.create({
         data: {
-          userId: session.user.id,
+          userId: user.id,
           action: 'BOOKING_CANCELLED',
           entityType: 'BOOKING',
           entityId: existingBooking.id,

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-    }
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { id } = await params
 
@@ -26,7 +26,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     if (!booking) return NextResponse.json({ message: 'Booking not found' }, { status: 404 })
 
-    if (booking.business.userId !== session.user.id) {
+    if (booking.businessId !== business.id) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
     }
 

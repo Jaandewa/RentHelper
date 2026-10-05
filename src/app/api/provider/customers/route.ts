@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 export function getCustomerDisplayId(id: string): string {
   const clean = id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
@@ -37,19 +39,8 @@ async function ensureCustomerProfilesExist() {
 // GET /api/provider/customers — List registered customers discoverable by provider
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-    }
-
-    const role = session.user.role?.toLowerCase()
-    if (role !== 'provider' && role !== 'admin') {
-      return NextResponse.json({ message: 'Forbidden — Providers only' }, { status: 403 })
-    }
-
-    const business = await prisma.business.findFirst({
-      where: { userId: session.user.id },
-    })
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { searchParams } = new URL(req.url)
     const search = (searchParams.get('q') || searchParams.get('search') || '').trim()

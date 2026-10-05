@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { getCustomerDisplayId } from '@/app/api/provider/customers/route'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 function maskPhone(phone: string | null): string {
   if (!phone) return 'N/A'
@@ -19,19 +21,8 @@ function maskEmail(email: string | null): string {
 
 export async function GET(req: Request) {
   try {
-    const session = await auth()
-    
-    if (!session?.user || (session.user.role !== 'provider' && session.user.role !== 'admin')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const business = await prisma.business.findFirst({
-      where: { userId: session.user.id }
-    })
-
-    if (!business) {
-      return NextResponse.json({ customers: [] })
-    }
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     // Find distinct customer IDs who have booked with this business
     const distinctBookings = await prisma.booking.findMany({

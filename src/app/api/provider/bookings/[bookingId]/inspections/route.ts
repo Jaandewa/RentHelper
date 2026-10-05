@@ -1,24 +1,23 @@
-import { auth } from '@/lib/auth'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
+export const runtime = 'nodejs'
+
 export async function GET(req: Request, { params }: { params: Promise<{ bookingId: string }> }) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { bookingId } = await params
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: {
-        business: true,
-      },
     })
 
     if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 
-    if (booking.business.userId !== session.user.id) {
+    if (booking.businessId !== business.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { isValidOtp, verifyOtp } from '@/lib/otp'
 import { maskPhoneForDisplay } from '@/lib/phone'
+import { requireAuthenticatedProviderRecoveryAccess } from '@/lib/provider-guard'
 
 const OTP_PURPOSE = 'PROVIDER_CHANGE_WHATSAPP'
 const MAX_ATTEMPTS = 5
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id || (session.user as any).role !== 'provider') {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const { error, user: guardUser, business: guardBusiness } = await requireAuthenticatedProviderRecoveryAccess()
+    if (error) return error
 
     const body = await req.json().catch(() => ({}))
     const { challengeId, sessionToken, code } = body
@@ -25,21 +23,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Please enter a valid 6-digit code.' }, { status: 400 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { id: true, email: true },
-    })
+    const user = guardUser
+    const business = guardBusiness
 
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id },
-      select: { id: true, name: true, normalizedPhone: true, phone: true },
-    })
-
-    if (!user || !business) {
-      return NextResponse.json({ ok: false, error: 'Account or Business profile not found.' }, { status: 404 })
-    }
-
-    const expectedPrefix = `${session.user.id}:${business.id}:`
+    const expectedPrefix = `${guardUser.id}:${business.id}:`
     if (!sessionToken.startsWith(expectedPrefix)) {
       return NextResponse.json({ ok: false, error: 'Invalid session binding.' }, { status: 400 })
     }
@@ -155,7 +142,7 @@ export async function POST(req: NextRequest) {
         // Write ActivityLog audit record (NO RAW PHONE NUMBERS!)
         await tx.activityLog.create({
           data: {
-            userId: session.user.id,
+            userId: guardUser.id,
             action: 'PROVIDER_WHATSAPP_CHANGED',
             entityType: 'Business',
             entityId: business.id,
@@ -187,7 +174,7 @@ export async function POST(req: NextRequest) {
           channel: 'whatsapp',
           type: 'whatsapp_text',
           recipient: newNormalizedPhone,
-          recipientUserId: session.user.id,
+          recipientUserId: guardUser.id,
           recipientType: 'PROVIDER',
           eventType: 'PROVIDER_WHATSAPP_CHANGED',
           status: 'pending',
@@ -206,7 +193,7 @@ export async function POST(req: NextRequest) {
             channel: 'email',
             type: 'email',
             recipient: user.email,
-            recipientUserId: session.user.id,
+            recipientUserId: guardUser.id,
             recipientType: 'PROVIDER',
             eventType: 'PROVIDER_WHATSAPP_CHANGED',
             status: 'pending',
@@ -227,7 +214,7 @@ export async function POST(req: NextRequest) {
             channel: 'whatsapp',
             type: 'whatsapp_text',
             recipient: oldNormalizedPhone,
-            recipientUserId: session.user.id,
+            recipientUserId: guardUser.id,
             recipientType: 'PROVIDER',
             eventType: 'PROVIDER_WHATSAPP_CHANGE_SECURITY_ALERT',
             status: 'pending',

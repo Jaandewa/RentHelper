@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs'
 import prisma from './prisma'
 import { cookies } from 'next/headers'
 import { authConfig } from './auth.config'
+import { canBypassPhoneVerification } from './verification-exception'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -78,7 +79,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               }
               token.role = dbUser.role
               token.businessCompleted = Boolean(dbUser.businessProfile)
-              token.phoneVerified = dbUser.businessProfile?.phoneVerified ?? false
+              let isPhoneVerified = dbUser.businessProfile?.phoneVerified ?? false
+              if (!isPhoneVerified && token.id) {
+                isPhoneVerified = await canBypassPhoneVerification(token.id as string, 'PROVIDER_PHONE')
+              }
+              token.phoneVerified = isPhoneVerified
               token.kycStatus = dbUser.customerProfile?.kycStatus || 'not_submitted'
               token.accountStatus = dbUser.customerProfile?.accountStatus || 'incomplete'
               token.kycRefreshedAt = now

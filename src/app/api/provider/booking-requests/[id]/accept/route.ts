@@ -1,13 +1,15 @@
-import { auth } from '@/lib/auth'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
 import prisma from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { checkItemAvailability } from '@/lib/booking/availability'
 import { sendProviderDecisionNotification, queueEventNotifications } from '@/lib/notifications/service'
 
+export const runtime = 'nodejs'
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { error, user, business } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { id } = await params
 
@@ -25,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
 
     // Verify provider owns this business
-    if (booking.business.userId !== session.user.id) {
+    if (booking.businessId !== business.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -61,7 +63,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       data: {
         status: 'awaiting_advance_payment',
         providerDecisionAt: new Date(),
-        providerDecisionBy: session.user.id,
+        providerDecisionBy: user.id,
         holdExpiresAt,
         holdStatus: 'active',
       },

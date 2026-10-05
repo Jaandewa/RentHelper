@@ -1,25 +1,17 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { auth } from '@/lib/auth'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-    }
+    const { error, business } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { name, fields } = await req.json()
     if (!name || name.trim() === '') {
       return NextResponse.json({ message: 'Category name is required' }, { status: 400 })
-    }
-
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id },
-    })
-
-    if (!business) {
-      return NextResponse.json({ message: 'Business profile not found' }, { status: 404 })
     }
 
     const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')

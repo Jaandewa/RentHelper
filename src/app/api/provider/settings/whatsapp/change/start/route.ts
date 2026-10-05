@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import {
@@ -12,6 +11,7 @@ import {
   generateSessionToken,
 } from '@/lib/otp'
 import { sendRegistrationOtpWhatsApp } from '@/lib/notifications/whatsapp'
+import { requireAuthenticatedProviderRecoveryAccess } from '@/lib/provider-guard'
 
 const OTP_PURPOSE = 'PROVIDER_CHANGE_WHATSAPP'
 const OTP_EXPIRY_MINUTES = 5
@@ -20,10 +20,8 @@ const MAX_SENDS_PER_15MIN = 3
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id || (session.user as any).role !== 'provider') {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-    }
+    const { error, user: guardUser, business: guardBusiness } = await requireAuthenticatedProviderRecoveryAccess()
+    if (error) return error
 
     const body = await req.json().catch(() => ({}))
     const { newPhone, currentPassword } = body
@@ -41,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: guardUser.id },
       select: { id: true, password: true },
     })
 
@@ -60,14 +58,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const business = await prisma.business.findUnique({
-      where: { userId: session.user.id },
-      select: { id: true, name: true, normalizedPhone: true },
-    })
-
-    if (!business) {
-      return NextResponse.json({ ok: false, error: 'Business profile not found.' }, { status: 404 })
-    }
+    const business = guardBusiness
 
     const normalized = normalizePhoneInternational(newPhone, 'LK')
     if (!normalized) {
@@ -136,7 +127,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Invalidate prior active PROVIDER_CHANGE_WHATSAPP challenges for this provider
-    const userSessionPrefix = `${session.user.id}:${business.id}`
+    const userSessionPrefix = `${guardUser.id}:${business.id}`
     await prisma.otpChallenge.updateMany({
       where: {
         purpose: OTP_PURPOSE,

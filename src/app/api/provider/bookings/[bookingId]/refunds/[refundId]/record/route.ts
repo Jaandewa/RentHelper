@@ -1,25 +1,17 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { sendRefundProcessedNotification } from '@/lib/notifications/service'
+import { requireVerifiedProviderAccess } from '@/lib/provider-guard'
+
+export const runtime = 'nodejs'
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ bookingId: string; refundId: string }> }
 ) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const providerBusiness = await prisma.business.findUnique({
-      where: { userId: session.user.id },
-    })
-
-    if (!providerBusiness) {
-      return NextResponse.json({ error: 'Provider business profile not found' }, { status: 403 })
-    }
+    const { error, user, business: providerBusiness } = await requireVerifiedProviderAccess()
+    if (error) return error
 
     const { bookingId, refundId } = await params
 
@@ -125,7 +117,7 @@ export async function POST(
         data: {
           status: 'PROCESSED',
           processedAt: now,
-          processedByUserId: session.user.id,
+          processedByUserId: user.id,
           method,
           referenceId: trimmedReference,
           notes: notes || undefined,
@@ -148,7 +140,7 @@ export async function POST(
       // 3. Write ActivityLog audit event
       await tx.activityLog.create({
         data: {
-          userId: session.user.id,
+          userId: user.id,
           action: 'REFUND_RECORDED',
           entityType: 'REFUND',
           entityId: refundRow.id,

@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
+import ContactSupportModal from '@/components/support/ContactSupportModal'
 
 export default function ProviderVerifyWhatsAppPage() {
   const router = useRouter()
   const [step, setStep] = useState<'idle' | 'sending' | 'sent' | 'verifying' | 'verified'>('idle')
+  const [showSupportModal, setShowSupportModal] = useState(false)
   const [maskedPhone, setMaskedPhone] = useState('')
   const [challengeId, setChallengeId] = useState('')
   const [sessionToken, setSessionToken] = useState('')
@@ -252,16 +254,24 @@ export default function ProviderVerifyWhatsAppPage() {
               >
                 Sign Out
               </button>
-              <a
-                href="mailto:support@healingcity.lk"
-                className="text-sm text-blue-600 hover:text-blue-800"
+              <button
+                type="button"
+                onClick={() => setShowSupportModal(true)}
+                className="text-sm text-purple-600 hover:text-purple-800 font-medium"
               >
-                Contact Support
-              </a>
+                Need Help? Contact Support
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      <ContactSupportModal
+        isOpen={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
+        defaultCategory="WHATSAPP_VERIFICATION_HELP"
+        sourcePage="/provider/verify-whatsapp"
+      />
     </div>
   )
 }

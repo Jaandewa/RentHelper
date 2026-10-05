@@ -22,10 +22,13 @@ import {
   MessageSquare,
   Store,
   FileText,
+  LifeBuoy,
 } from 'lucide-react'
+import ThemeToggle from '@/components/theme/ThemeToggle'
 
 const navItems = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true },
+  { label: 'Support Inbox', href: '/admin/support', icon: LifeBuoy },
   { label: 'Providers', href: '/admin/providers', icon: Building2 },
   { label: 'Customers', href: '/admin/customers', icon: Users },
   { label: 'KYC Review', href: '/admin/kyc-approvals', icon: ShieldQuestion },
@@ -162,6 +165,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             )}
           </div>
           <div className="admin-topbar__actions">
+            <ThemeToggle />
             <button className="admin-topbar__icon-btn">
               <Bell size={18} />
             </button>

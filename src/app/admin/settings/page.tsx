@@ -15,6 +15,8 @@ interface SiteSettings {
   googleClientSecret: string | null
   emailFromName: string
   emailFromAddress: string
+  supportEmail: string | null
+  securityEmail: string | null
   smtpHost: string | null
   smtpPort: number
   smtpUser: string | null
@@ -495,6 +497,16 @@ export default function SettingsPage() {
             <div className="admin-form-group">
               <label className="admin-form-label">From Email</label>
               <input className="admin-form-input" type="email" value={form.emailFromAddress || ''} onChange={e => set('emailFromAddress', e.target.value)} placeholder="noreply@renthelper.lk" />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="admin-form-group">
+              <label className="admin-form-label">Support Notification Email</label>
+              <input className="admin-form-input" type="email" value={form.supportEmail || ''} onChange={e => set('supportEmail', e.target.value)} placeholder="support@renthelper.lk" />
+            </div>
+            <div className="admin-form-group">
+              <label className="admin-form-label">Security Alert Notification Email</label>
+              <input className="admin-form-input" type="email" value={form.securityEmail || ''} onChange={e => set('securityEmail', e.target.value)} placeholder="security@renthelper.lk" />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
