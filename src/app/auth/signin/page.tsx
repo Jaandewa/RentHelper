@@ -1,13 +1,33 @@
 'use client'
 
-import { signIn } from 'next-auth/react'
+import { signIn, useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { useState, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
+
+function getSafeCallbackUrl(rawCallback: string | null): string | null {
+  if (!rawCallback) return null
+  try {
+    const decoded = decodeURIComponent(rawCallback)
+    if (decoded.startsWith('/') && !decoded.startsWith('//') && !decoded.startsWith('/auth/')) {
+      return decoded
+    }
+    if (typeof window !== 'undefined') {
+      const parsed = new URL(decoded, window.location.origin)
+      if (parsed.origin === window.location.origin && !parsed.pathname.startsWith('/auth/')) {
+        return parsed.pathname + parsed.search
+      }
+    }
+  } catch {}
+  return null
+}
 
 function SignInContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const { data: session, status } = useSession()
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -18,12 +38,33 @@ function SignInContent() {
   )
   const [isLoading, setIsLoading] = useState(false)
 
+  // Redirect if user is ALREADY authenticated on tab load
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      const role = session.user.role || 'customer'
+      const callback = getSafeCallbackUrl(searchParams.get('callbackUrl'))
+
+      if (callback) {
+        window.location.href = callback
+        return
+      }
+
+      if (role === 'admin') {
+        window.location.href = '/admin'
+      } else if (role === 'provider') {
+        window.location.href = '/dashboard'
+      } else {
+        window.location.href = '/customer/dashboard'
+      }
+    }
+  }, [status, session, searchParams])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isLoading) return
     setIsLoading(true)
     setError('')
-    
+
     try {
       const res = await signIn('credentials', {
         email,
@@ -34,16 +75,21 @@ function SignInContent() {
       if (res?.error) {
         setError('Invalid email or password')
       } else {
-        // Use window.location for full page reload to pick up auth cookies
         const sessionRes = await fetch('/api/auth/session')
-        const session = await sessionRes.json()
-        const role = session?.user?.role
+        const sessionData = await sessionRes.json()
+        const role = sessionData?.user?.role || 'customer'
 
-        // Role-based redirect — role ALWAYS takes priority
+        const safeCallback = getSafeCallbackUrl(searchParams.get('callbackUrl'))
+
+        if (safeCallback) {
+          window.location.href = safeCallback
+          return
+        }
+
+        // Role-based destination fallback
         if (role === 'admin') {
           window.location.href = '/admin'
         } else if (role === 'customer') {
-          // Check KYC status for customers
           const meRes = await fetch('/api/auth/me')
           const meData = await meRes.json()
           const kycStatus = meData?.user?.customerProfile?.kycStatus
@@ -54,17 +100,10 @@ function SignInContent() {
           } else if (kycStatus === 'rejected' || kycStatus === 'more_info_required') {
             window.location.href = '/onboarding/kyc?resubmit=true'
           } else {
-            // No profile or not_submitted
             window.location.href = '/onboarding/kyc'
           }
         } else {
-          // Provider — use callbackUrl if available
-          const callbackUrl = searchParams.get('callbackUrl')
-          if (callbackUrl && !callbackUrl.includes('/auth/')) {
-            window.location.href = decodeURI(callbackUrl)
-          } else {
-            window.location.href = '/dashboard'
-          }
+          window.location.href = '/dashboard'
         }
       }
     } catch (err) {
@@ -74,6 +113,14 @@ function SignInContent() {
     }
   }
 
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg border border-gray-100 animate-slideUp motion-reduce:animate-none">
@@ -81,10 +128,10 @@ function SignInContent() {
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Welcome Back</h2>
           <p className="mt-2 text-sm text-gray-600">Sign in to your RentHelper account</p>
         </div>
-        
+
         <div className="mt-8 space-y-6">
           <button
-            onClick={() => signIn('google', { callbackUrl: '/auth/redirect' })}
+            onClick={() => signIn('google', { callbackUrl: searchParams.get('callbackUrl') || '/auth/redirect' })}
             className="w-full flex justify-center items-center gap-3 py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <svg viewBox="0 0 24 24" width="20" height="20">
@@ -95,7 +142,7 @@ function SignInContent() {
             </svg>
             Sign in with Google
           </button>
-          
+
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300" />
@@ -111,7 +158,7 @@ function SignInContent() {
                 {error}
               </div>
             )}
-            
+
             <div>
               <label htmlFor="signin-email" className="block text-sm font-medium text-gray-700">Email address</label>
               <input
