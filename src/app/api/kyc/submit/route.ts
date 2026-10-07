@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { normalizeIdentityNumber } from '@/lib/phone'
+import { isValidCity } from '@/lib/location/sri-lanka'
 
 export async function POST(req: Request) {
   try {
@@ -36,6 +37,13 @@ export async function POST(req: Request) {
     if (!nicFrontUrl || !nicBackUrl) {
       return NextResponse.json(
         { message: 'Please upload both front and back photos of your ID document.' },
+        { status: 400 }
+      )
+    }
+
+    if (city && !isValidCity(city)) {
+      return NextResponse.json(
+        { message: 'Invalid Sri Lanka location selected. Please select a valid Province, District, and City.' },
         { status: 400 }
       )
     }

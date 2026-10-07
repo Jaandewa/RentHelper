@@ -6,9 +6,12 @@ import { Phone, User, Shield, FileText, Upload, X, CheckCircle, Loader2 } from '
 
 import { optimizeImageBeforeUpload, OptimizeImageResult } from '@/lib/upload/optimizeImage'
 
+import SriLankaLocationPicker, { LocationValue } from '@/components/location/SriLankaLocationPicker'
+
 export default function KYCOnboarding() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [location, setLocation] = useState<LocationValue>({ province: '', district: '', city: '' })
   const [formData, setFormData] = useState({
     fullName: '',
     nicNumber: '',
@@ -323,10 +326,15 @@ export default function KYCOnboarding() {
                   className="block w-full border border-gray-300 rounded-lg py-2.5 px-3 text-sm focus:ring-blue-500 focus:border-blue-500 resize-none" />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
-                <input required type="text" name="city" value={formData.city} onChange={handleChange}
-                  className="block w-full border border-gray-300 rounded-lg py-2.5 px-3 text-sm focus:ring-blue-500 focus:border-blue-500" />
+              <div className="col-span-2 pt-2">
+                <SriLankaLocationPicker
+                  value={location}
+                  onChange={(loc) => {
+                    setLocation(loc)
+                    setFormData((prev) => ({ ...prev, city: loc.city }))
+                  }}
+                  required
+                />
               </div>
             </div>
           </div>

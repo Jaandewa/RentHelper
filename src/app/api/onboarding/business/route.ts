@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { isValidCity } from '@/lib/location/sri-lanka'
 
 export async function POST(req: Request) {
   try {
@@ -14,6 +15,13 @@ export async function POST(req: Request) {
     
     if (!name || !phone || !city) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 })
+    }
+
+    if (!isValidCity(city)) {
+      return NextResponse.json(
+        { message: 'Invalid Sri Lanka location selected. Please select a valid Province, District, and City.' },
+        { status: 400 }
+      )
     }
 
     await prisma.business.upsert({

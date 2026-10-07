@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
+import { getAllCities } from '@/lib/location/sri-lanka';
 import { Search, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function MarketplaceHomePage() {
@@ -22,7 +23,7 @@ export default function MarketplaceHomePage() {
     { name: 'IT Equipment', slug: 'it-equipment' },
     { name: 'Sports & Outdoors', slug: 'sports-outdoors' },
   ];
-  const cities = ['Colombo', 'Kandy', 'Galle', 'Negombo', 'Matara', 'Jaffna', 'Kurunegala'];
+  const cities = getAllCities();
 
   const fetchAds = async () => {
     setLoading(true);

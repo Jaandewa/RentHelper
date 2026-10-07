@@ -17,6 +17,7 @@ import {
   Camera
 } from 'lucide-react'
 import { toast } from 'sonner'
+import SriLankaLocationPicker, { LocationValue } from '@/components/location/SriLankaLocationPicker'
 
 export default function ProviderProfilePage() {
   const router = useRouter()
@@ -33,6 +34,7 @@ export default function ProviderProfilePage() {
   const [description, setDescription] = useState('')
   const [address, setAddress] = useState('')
   const [city, setCity] = useState('')
+  const [location, setLocation] = useState<LocationValue>({ province: '', district: '', city: '' })
   const [depositPolicy, setDepositPolicy] = useState('')
   const [cancellationPolicy, setCancellationPolicy] = useState('')
 
@@ -56,6 +58,7 @@ export default function ProviderProfilePage() {
           setDescription(data.business.description || '')
           setAddress(data.business.address || '')
           setCity(data.business.city || '')
+          setLocation({ province: '', district: '', city: data.business.city || '' })
           setDepositPolicy(data.business.depositPolicy || '')
           setCancellationPolicy(data.business.cancellationPolicy || '')
         }
@@ -186,16 +189,14 @@ export default function ProviderProfilePage() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-                Service City / Primary District
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Colombo, Kandy, Galle"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+            <div className="md:col-span-2 pt-2">
+              <SriLankaLocationPicker
+                value={location}
+                onChange={(loc) => {
+                  setLocation(loc)
+                  setCity(loc.city)
+                }}
+                required={false}
               />
             </div>
 

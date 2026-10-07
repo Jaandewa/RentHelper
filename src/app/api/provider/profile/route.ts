@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { isValidCity } from '@/lib/location/sri-lanka'
 
 const ALLOWED_PROVIDER_FIELDS = new Set([
   'logo',
@@ -120,6 +121,13 @@ export async function PATCH(req: Request) {
     }
 
     const { logo, description, address, city, depositPolicy, cancellationPolicy, operatingHours, pickupInstructions, returnInstructions } = body
+
+    if (city && typeof city === 'string' && city.trim() !== '' && !isValidCity(city)) {
+      return NextResponse.json(
+        { error: 'Invalid Sri Lanka location selected. Please select a valid Province, District, and City.' },
+        { status: 400 }
+      )
+    }
 
     const updateData: any = {}
     if (logo !== undefined) updateData.logo = typeof logo === 'string' ? logo : null

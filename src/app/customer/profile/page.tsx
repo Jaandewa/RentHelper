@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Header from '@/components/layout/Header'
+import SriLankaLocationPicker, { LocationValue } from '@/components/location/SriLankaLocationPicker'
 import {
   User,
   ShieldCheck,
@@ -32,6 +33,7 @@ export default function CustomerProfilePage() {
   const [image, setImage] = useState('')
   const [address, setAddress] = useState('')
   const [city, setCity] = useState('')
+  const [location, setLocation] = useState<LocationValue>({ province: '', district: '', city: '' })
   const [emergencyContact, setEmergencyContact] = useState('')
   const [emergencyPhone, setEmergencyPhone] = useState('')
   const [allowCrossProviderShare, setAllowCrossProviderShare] = useState(true)
@@ -55,6 +57,7 @@ export default function CustomerProfilePage() {
           const cp = data.user.customerProfile || {}
           setAddress(cp.address || '')
           setCity(cp.city || '')
+          setLocation({ province: '', district: '', city: cp.city || '' })
           setEmergencyContact(cp.emergencyContact || '')
           setEmergencyPhone(cp.emergencyPhone || '')
           setAllowCrossProviderShare(cp.allowCrossProviderShare !== false)
@@ -184,16 +187,14 @@ export default function CustomerProfilePage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-                  City / District
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Colombo, Kandy, Galle"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              <div className="md:col-span-2 pt-2">
+                <SriLankaLocationPicker
+                  value={location}
+                  onChange={(loc) => {
+                    setLocation(loc)
+                    setCity(loc.city)
+                  }}
+                  required={false}
                 />
               </div>
 

@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import SriLankaLocationPicker, { LocationValue } from '@/components/location/SriLankaLocationPicker'
 
 export default function BusinessOnboarding() {
   const router = useRouter()
   const [checking, setChecking] = useState(true)
+  const [location, setLocation] = useState<LocationValue>({ province: '', district: '', city: '' })
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -79,10 +81,15 @@ export default function BusinessOnboarding() {
                 value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
             </div>
 
-            <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-medium text-gray-700">City *</label>
-              <input required type="text" className="mt-1 block w-full border border-gray-300 rounded-md py-2 px-3 focus:ring-blue-500 focus:border-blue-500"
-                value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+            <div className="col-span-2 pt-2">
+              <SriLankaLocationPicker
+                value={location}
+                onChange={(loc) => {
+                  setLocation(loc)
+                  setFormData((prev) => ({ ...prev, city: loc.city }))
+                }}
+                required
+              />
             </div>
 
             <div className="col-span-2">
