@@ -107,9 +107,17 @@ const CATEGORY_ITEMS = [
   },
 ];
 
+import { HeroSlideItem, DEFAULT_HERO_SLIDES } from '@/app/api/hero-slides/route';
+
 export default function MarketplaceHomePage() {
   const [ads, setAds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Slideshow State
+  const [slides, setSlides] = useState<HeroSlideItem[]>(DEFAULT_HERO_SLIDES);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [slideDuration, setSlideDuration] = useState(3);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Search & Filter State
   const [search, setSearch] = useState('');
@@ -120,6 +128,40 @@ export default function MarketplaceHomePage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
+
+  // Fetch Hero Slides configuration
+  useEffect(() => {
+    fetch('/api/hero-slides')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.slides && Array.isArray(d.slides) && d.slides.length > 0) {
+          setSlides(d.slides);
+        }
+        if (d?.duration) {
+          setSlideDuration(d.duration);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Auto Slide Timer (3 seconds default or custom duration)
+  useEffect(() => {
+    if (slides.length <= 1 || isHovered) return;
+    const interval = setInterval(() => {
+      setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
+    }, (slideDuration || 3) * 1000);
+    return () => clearInterval(interval);
+  }, [slides.length, slideDuration, isHovered]);
+
+  const currentSlide = slides[currentSlideIndex] || DEFAULT_HERO_SLIDES[0];
+
+  const handlePrevSlide = () => {
+    setCurrentSlideIndex((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
+  };
+
+  const handleNextSlide = () => {
+    setCurrentSlideIndex((prev) => (prev + 1) % slides.length);
+  };
 
   // Location data
   const provinces = useMemo(() => getAllProvinces(), []);
@@ -197,122 +239,181 @@ export default function MarketplaceHomePage() {
           {/* ─────────────────────────────────────────────────────────────
               1. HERO SECTION (Matching Reference Image Vibe & Layout)
           ───────────────────────────────────────────────────────────── */}
-          <section className="relative rounded-[2.5rem] overflow-hidden shadow-2xl mb-12 border border-slate-200/50 dark:border-slate-800">
-            {/* Background Mountain Image */}
+          <section
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className="relative rounded-[2.5rem] overflow-hidden shadow-2xl mb-12 border border-slate-200/50 dark:border-slate-800 transition-all duration-700"
+          >
+            {/* Background Image Slideshow with smooth transition */}
             <div
-              className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
+              key={currentSlide.id}
+              className="absolute inset-0 bg-cover bg-center transition-all duration-1000 scale-105 animate-fade-in"
               style={{
-                backgroundImage: `url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1600&q=80')`,
+                backgroundImage: `url('${currentSlide.imageUrl}')`,
               }}
             />
 
             {/* Dark Scenic Overlay */}
             <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/70 to-slate-950/30 dark:from-slate-950/95 dark:via-slate-950/80 dark:to-slate-950/50" />
 
-            <div className="relative z-10 px-6 sm:px-12 lg:px-16 pt-12 sm:pt-16 pb-20 sm:pb-24 flex flex-col justify-between min-h-[460px]">
+            {/* Previous Slide Arrow */}
+            {slides.length > 1 && (
+              <button
+                onClick={handlePrevSlide}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-slate-950/40 hover:bg-slate-950/80 text-white backdrop-blur-md border border-white/20 flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
+                aria-label="Previous Slide"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+            )}
+
+            {/* Next Slide Arrow */}
+            {slides.length > 1 && (
+              <button
+                onClick={handleNextSlide}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-slate-950/40 hover:bg-slate-950/80 text-white backdrop-blur-md border border-white/20 flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-lg"
+                aria-label="Next Slide"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            )}
+
+            <div className="relative z-10 px-6 sm:px-12 lg:px-16 pt-12 sm:pt-16 pb-20 sm:pb-24 flex flex-col justify-between min-h-[480px]">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="max-w-2xl">
                   {/* Top Green Pill Badge */}
                   <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-teal-500 text-white shadow-lg backdrop-blur-md mb-6">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Rent Anything, Anywhere</span>
+                    <span>{currentSlide.badgeText || 'Rent Anything, Anywhere'}</span>
                   </div>
 
                   {/* Headline */}
                   <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-[1.15]">
-                    Need an Item?{' '}
+                    {currentSlide.title}{' '}
                     <span className="block text-teal-400 dark:text-teal-300 font-extrabold mt-1 drop-shadow-md">
-                      Rent It Instead!
+                      {currentSlide.highlightText}
                     </span>
                   </h1>
 
                   {/* Subtitle */}
                   <p className="mt-4 text-base sm:text-lg text-slate-200 font-medium leading-relaxed max-w-xl">
-                    From electronics to outdoor gear, find and rent the items you need — at the best prices, from people near you.
+                    {currentSlide.subtitle}
                   </p>
+
+                  {/* Slide CTA Button (if custom CTA link present) */}
+                  {currentSlide.ctaLink && currentSlide.ctaLink !== '#search' && (
+                    <div className="mt-6">
+                      <Link
+                        href={currentSlide.ctaLink}
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold backdrop-blur-md border border-white/30 transition-all shadow-lg hover:scale-105 active:scale-95"
+                      >
+                        <span>{currentSlide.ctaText || 'Explore Category →'}</span>
+                      </Link>
+                    </div>
+                  )}
                 </div>
 
                 {/* Handwritten Doodle Graphic Annotation */}
                 <div className="hidden lg:flex flex-col items-center rotate-6 text-amber-300 font-semibold tracking-wide drop-shadow-lg select-none">
                   <span className="text-xl font-bold italic border-b-2 border-dashed border-amber-300/60 pb-1">
-                    More Choices ✨
+                    {currentSlide.doodleTop || 'More Choices ✨'}
                   </span>
                   <span className="text-2xl font-black text-white">
-                    Less Cost!
+                    {currentSlide.doodleBottom || 'Less Cost!'}
                   </span>
                 </div>
               </div>
 
-              {/* Floating White Search Card */}
-              <div className="mt-10 bg-white dark:bg-slate-900 rounded-full sm:rounded-full p-2 sm:p-3 shadow-2xl border border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white backdrop-blur-xl">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-2 px-2">
-                  {/* Search Input */}
-                  <div className="flex-1 flex items-center gap-3 px-4 py-2.5 w-full">
-                    <Search className="w-5 h-5 text-slate-400 shrink-0" />
-                    <input
-                      type="text"
-                      placeholder="What are you looking for?"
-                      className="w-full bg-transparent text-sm font-medium focus:outline-none placeholder:text-slate-400 text-slate-900 dark:text-white"
-                      value={search}
-                      onChange={(e) => {
-                        setSearch(e.target.value);
-                        setPage(1);
-                      }}
-                    />
-                  </div>
+              {/* Floating White Search Card & Slide Pagination Dots */}
+              <div className="mt-10">
+                <div id="search" className="bg-white dark:bg-slate-900 rounded-full sm:rounded-full p-2 sm:p-3 shadow-2xl border border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white backdrop-blur-xl">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-2 px-2">
+                    {/* Search Input */}
+                    <div className="flex-1 flex items-center gap-3 px-4 py-2.5 w-full">
+                      <Search className="w-5 h-5 text-slate-400 shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="What are you looking for?"
+                        className="w-full bg-transparent text-sm font-medium focus:outline-none placeholder:text-slate-400 text-slate-900 dark:text-white"
+                        value={search}
+                        onChange={(e) => {
+                          setSearch(e.target.value);
+                          setPage(1);
+                        }}
+                      />
+                    </div>
 
-                  {/* Vertical Divider */}
-                  <div className="hidden md:block w-px h-8 bg-slate-200 dark:bg-slate-800" />
+                    {/* Vertical Divider */}
+                    <div className="hidden md:block w-px h-8 bg-slate-200 dark:bg-slate-800" />
 
-                  {/* Cascading Location Selectors */}
-                  <div className="flex items-center gap-2 px-3 py-2 w-full md:w-auto">
-                    <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                    <select
-                      className="bg-transparent text-sm font-semibold focus:outline-none cursor-pointer text-slate-700 dark:text-slate-200 max-w-[140px] truncate"
-                      value={province}
-                      onChange={(e) => {
-                        setProvince(e.target.value);
-                        setDistrict('');
-                        setCity('');
+                    {/* Cascading Location Selectors */}
+                    <div className="flex items-center gap-2 px-3 py-2 w-full md:w-auto">
+                      <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                      <select
+                        className="bg-transparent text-sm font-semibold focus:outline-none cursor-pointer text-slate-700 dark:text-slate-200 max-w-[140px] truncate"
+                        value={province}
+                        onChange={(e) => {
+                          setProvince(e.target.value);
+                          setDistrict('');
+                          setCity('');
+                          setPage(1);
+                        }}
+                      >
+                        <option value="" className="text-slate-900 dark:text-white">All Provinces</option>
+                        {provinces.map((p) => (
+                          <option key={p} value={p} className="text-slate-900 dark:text-white">
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        className="bg-transparent text-sm font-semibold focus:outline-none cursor-pointer text-slate-700 dark:text-slate-200 max-w-[140px] truncate"
+                        value={city}
+                        onChange={(e) => {
+                          setCity(e.target.value);
+                          setPage(1);
+                        }}
+                      >
+                        <option value="" className="text-slate-900 dark:text-white">All Cities</option>
+                        {availableCities.map((c) => (
+                          <option key={c} value={c} className="text-slate-900 dark:text-white">
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Search Action Button */}
+                    <button
+                      onClick={() => {
                         setPage(1);
+                        fetchAds();
                       }}
+                      className="w-full md:w-auto bg-teal-600 hover:bg-teal-700 text-white font-bold px-8 py-3 rounded-full shadow-lg hover:shadow-teal-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95"
                     >
-                      <option value="" className="text-slate-900 dark:text-white">All Provinces</option>
-                      {provinces.map((p) => (
-                        <option key={p} value={p} className="text-slate-900 dark:text-white">
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-
-                    <select
-                      className="bg-transparent text-sm font-semibold focus:outline-none cursor-pointer text-slate-700 dark:text-slate-200 max-w-[140px] truncate"
-                      value={city}
-                      onChange={(e) => {
-                        setCity(e.target.value);
-                        setPage(1);
-                      }}
-                    >
-                      <option value="" className="text-slate-900 dark:text-white">All Cities</option>
-                      {availableCities.map((c) => (
-                        <option key={c} value={c} className="text-slate-900 dark:text-white">
-                          {c}
-                        </option>
-                      ))}
-                    </select>
+                      <span>Search</span>
+                    </button>
                   </div>
-
-                  {/* Search Action Button */}
-                  <button
-                    onClick={() => {
-                      setPage(1);
-                      fetchAds();
-                    }}
-                    className="w-full md:w-auto bg-teal-600 hover:bg-teal-700 text-white font-bold px-8 py-3 rounded-full shadow-lg hover:shadow-teal-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95"
-                  >
-                    <span>Search</span>
-                  </button>
                 </div>
+
+                {/* Slideshow Dots Pagination */}
+                {slides.length > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    {slides.map((s, idx) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setCurrentSlideIndex(idx)}
+                        className={`h-2.5 rounded-full transition-all cursor-pointer ${
+                          idx === currentSlideIndex
+                            ? 'w-8 bg-teal-400 shadow-md scale-110'
+                            : 'w-2.5 bg-white/40 hover:bg-white/70'
+                        }`}
+                        aria-label={`Go to slide ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </section>
