@@ -107,7 +107,7 @@ export const DEFAULT_HERO_SLIDES: HeroSlideItem[] = [
 // GET /api/hero-slides — Fetch active hero slideshow slides & global duration
 export async function GET() {
   try {
-    const settings = await prisma.siteSettings.findUnique({ where: { id: '1' } })
+    const settings = await prisma.siteSettings.findUnique({ where: { id: '1' } }) as any
     
     if (settings?.heroSlidesConfig) {
       try {
@@ -115,7 +115,7 @@ export async function GET() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           const activeSlides = parsed.filter((s: HeroSlideItem) => s.isActive !== false)
           if (activeSlides.length > 0) {
-            return NextResponse.json({ slides: activeSlides, duration: settings.heroSlideDurationSeconds || 3 })
+            return NextResponse.json({ slides: activeSlides, duration: settings?.heroSlideDurationSeconds || 3 })
           }
         }
       } catch {
