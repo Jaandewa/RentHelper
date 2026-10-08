@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Save, Eye, EyeOff, Palette, Globe, Mail, CreditCard, Shield, CheckCircle, Package, Loader2, SendHorizonal } from 'lucide-react'
+import { Save, Eye, EyeOff, Palette, Globe, Mail, CreditCard, Shield, CheckCircle, Package, Loader2, SendHorizonal, Sliders, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
+import { HeroSlideItem, DEFAULT_HERO_SLIDES } from '@/app/api/hero-slides/route'
 
 interface SiteSettings {
   id: string
@@ -29,6 +30,8 @@ interface SiteSettings {
   subscriptionName: string
   subscriptionMaxItems: number
   itemFieldConfig: string | null
+  heroSlidesConfig?: string | null
+  heroSlideDurationSeconds?: number
 }
 
 // All available item fields with their default settings
@@ -84,6 +87,7 @@ const DEFAULT_FIELD_CONFIG: FieldConfig = {
 
 const TABS = [
   { id: 'branding', label: 'Branding & Site', icon: Palette },
+  { id: 'slideshow', label: 'Hero Slideshow', icon: Sliders },
   { id: 'subscription', label: 'Subscription', icon: CreditCard },
   { id: 'itemfields', label: 'Item Fields', icon: Package },
   { id: 'apis', label: 'API Keys', icon: Shield },
@@ -95,6 +99,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [form, setForm] = useState<Partial<SiteSettings>>({})
   const [fieldConfig, setFieldConfig] = useState<FieldConfig>(DEFAULT_FIELD_CONFIG)
+  const [heroSlides, setHeroSlides] = useState<HeroSlideItem[]>(DEFAULT_HERO_SLIDES)
+  const [heroSlideDuration, setHeroSlideDuration] = useState<number>(3)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -116,6 +122,18 @@ export default function SettingsPage() {
             setFieldConfig({ ...DEFAULT_FIELD_CONFIG, ...parsed })
           } catch { /* keep defaults */ }
         }
+        // Parse stored heroSlidesConfig or use defaults
+        if (d.settings?.heroSlidesConfig) {
+          try {
+            const parsedSlides = JSON.parse(d.settings.heroSlidesConfig)
+            if (Array.isArray(parsedSlides) && parsedSlides.length > 0) {
+              setHeroSlides(parsedSlides)
+            }
+          } catch { /* keep default slides */ }
+        }
+        if (d.settings?.heroSlideDurationSeconds) {
+          setHeroSlideDuration(d.settings.heroSlideDurationSeconds)
+        }
         setLoading(false)
       })
   }, [])
@@ -125,7 +143,12 @@ export default function SettingsPage() {
     const res = await fetch('/api/admin/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, itemFieldConfig: JSON.stringify(fieldConfig) }),
+      body: JSON.stringify({
+        ...form,
+        itemFieldConfig: JSON.stringify(fieldConfig),
+        heroSlidesConfig: JSON.stringify(heroSlides),
+        heroSlideDurationSeconds: Number(heroSlideDuration) || 3,
+      }),
     })
     if (!res.ok) {
       setSaving(false)
@@ -625,6 +648,281 @@ export default function SettingsPage() {
               </div>
             )
           })()}
+        </div>
+      )}
+
+      {/* HERO SLIDESHOW TAB */}
+      {activeTab === 'slideshow' && (
+        <div className="admin-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#e2e8f0' }}>Homepage Hero Slideshow</h3>
+              <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                Add, edit, reorder, or toggle slides displayed on the main marketplace hero banner.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary"
+              onClick={() => {
+                const newSlide: HeroSlideItem = {
+                  id: `slide-${Date.now()}`,
+                  title: 'New Headline',
+                  highlightText: 'Featured Offer',
+                  subtitle: 'Describe the rental items or promotional offer here.',
+                  badgeText: 'New Collection',
+                  ctaText: 'Browse Now →',
+                  ctaLink: '/marketplace',
+                  imageUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1600&q=80',
+                  doodleTop: 'Special ✨',
+                  doodleBottom: 'Rent Today!',
+                  slideDurationSeconds: 3,
+                  isActive: true,
+                }
+                setHeroSlides(prev => [...prev, newSlide])
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Plus size={15} /> Add New Slide
+            </button>
+          </div>
+
+          {/* Global Duration Selector */}
+          <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '24px' }}>
+            <label className="admin-form-label" style={{ marginBottom: '6px' }}>Auto-Slide Transition Duration (Seconds)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <input
+                type="number"
+                min={1}
+                max={30}
+                className="admin-form-input"
+                style={{ width: '120px' }}
+                value={heroSlideDuration}
+                onChange={e => setHeroSlideDuration(Number(e.target.value))}
+              />
+              <span style={{ fontSize: '13px', color: '#94a3b8' }}>Seconds per slide (Default: 3 seconds)</span>
+            </div>
+          </div>
+
+          {/* Slide Cards List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {heroSlides.map((slide, idx) => (
+              <div
+                key={slide.id}
+                style={{
+                  padding: '20px',
+                  background: slide.isActive !== false ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.005)',
+                  border: `1px solid ${slide.isActive !== false ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)'}`,
+                  borderRadius: '16px',
+                  opacity: slide.isActive !== false ? 1 : 0.6,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ padding: '4px 10px', background: 'rgba(20,184,166,0.15)', color: '#2dd4bf', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>
+                      Slide #{idx + 1}
+                    </span>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
+                      {slide.title} {slide.highlightText}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary"
+                      disabled={idx === 0}
+                      onClick={() => {
+                        if (idx === 0) return
+                        const updated = [...heroSlides]
+                        const temp = updated[idx - 1]
+                        updated[idx - 1] = updated[idx]
+                        updated[idx] = temp
+                        setHeroSlides(updated)
+                      }}
+                      style={{ padding: '6px 10px' }}
+                      title="Move Up"
+                    >
+                      <ArrowUp size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary"
+                      disabled={idx === heroSlides.length - 1}
+                      onClick={() => {
+                        if (idx === heroSlides.length - 1) return
+                        const updated = [...heroSlides]
+                        const temp = updated[idx + 1]
+                        updated[idx + 1] = updated[idx]
+                        updated[idx] = temp
+                        setHeroSlides(updated)
+                      }}
+                      style={{ padding: '6px 10px' }}
+                      title="Move Down"
+                    >
+                      <ArrowDown size={14} />
+                    </button>
+
+                    <label className="admin-toggle" style={{ margin: '0 4px' }} title="Toggle Active">
+                      <input
+                        type="checkbox"
+                        checked={slide.isActive !== false}
+                        onChange={e => {
+                          const updated = [...heroSlides]
+                          updated[idx].isActive = e.target.checked
+                          setHeroSlides(updated)
+                        }}
+                      />
+                      <span className="admin-toggle__slider" />
+                    </label>
+
+                    <button
+                      type="button"
+                      className="admin-btn"
+                      onClick={() => {
+                        if (confirm(`Are you sure you want to delete Slide #${idx + 1}?`)) {
+                          setHeroSlides(prev => prev.filter((_, i) => i !== idx))
+                        }
+                      }}
+                      style={{ padding: '6px 10px', background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}
+                      title="Delete Slide"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">Headline Title</label>
+                    <input
+                      className="admin-form-input"
+                      value={slide.title || ''}
+                      onChange={e => {
+                        const updated = [...heroSlides]
+                        updated[idx].title = e.target.value
+                        setHeroSlides(updated)
+                      }}
+                      placeholder="Need an Item?"
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">Highlight Text (Teal)</label>
+                    <input
+                      className="admin-form-input"
+                      value={slide.highlightText || ''}
+                      onChange={e => {
+                        const updated = [...heroSlides]
+                        updated[idx].highlightText = e.target.value
+                        setHeroSlides(updated)
+                      }}
+                      placeholder="Rent It Instead!"
+                    />
+                  </div>
+
+                  <div className="admin-form-group" style={{ gridColumn: 'span 2' }}>
+                    <label className="admin-form-label">Subtitle Description</label>
+                    <input
+                      className="admin-form-input"
+                      value={slide.subtitle || ''}
+                      onChange={e => {
+                        const updated = [...heroSlides]
+                        updated[idx].subtitle = e.target.value
+                        setHeroSlides(updated)
+                      }}
+                      placeholder="From electronics to outdoor gear, find and rent..."
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">Top Pill Badge Text</label>
+                    <input
+                      className="admin-form-input"
+                      value={slide.badgeText || ''}
+                      onChange={e => {
+                        const updated = [...heroSlides]
+                        updated[idx].badgeText = e.target.value
+                        setHeroSlides(updated)
+                      }}
+                      placeholder="Sri Lankan Fashion & Bridal"
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">Background Image URL (Unsplash / Direct)</label>
+                    <input
+                      className="admin-form-input"
+                      value={slide.imageUrl || ''}
+                      onChange={e => {
+                        const updated = [...heroSlides]
+                        updated[idx].imageUrl = e.target.value
+                        setHeroSlides(updated)
+                      }}
+                      placeholder="https://images.unsplash.com/..."
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">CTA Button Label</label>
+                    <input
+                      className="admin-form-input"
+                      value={slide.ctaText || ''}
+                      onChange={e => {
+                        const updated = [...heroSlides]
+                        updated[idx].ctaText = e.target.value
+                        setHeroSlides(updated)
+                      }}
+                      placeholder="Browse Sarees & Frocks →"
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">CTA Link URL</label>
+                    <input
+                      className="admin-form-input"
+                      value={slide.ctaLink || ''}
+                      onChange={e => {
+                        const updated = [...heroSlides]
+                        updated[idx].ctaLink = e.target.value
+                        setHeroSlides(updated)
+                      }}
+                      placeholder="/marketplace?category=clothing-bridal"
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">Doodle Note (Top)</label>
+                    <input
+                      className="admin-form-input"
+                      value={slide.doodleTop || ''}
+                      onChange={e => {
+                        const updated = [...heroSlides]
+                        updated[idx].doodleTop = e.target.value
+                        setHeroSlides(updated)
+                      }}
+                      placeholder="Sarees & Frocks 💃"
+                    />
+                  </div>
+
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">Doodle Note (Bottom)</label>
+                    <input
+                      className="admin-form-input"
+                      value={slide.doodleBottom || ''}
+                      onChange={e => {
+                        const updated = [...heroSlides]
+                        updated[idx].doodleBottom = e.target.value
+                        setHeroSlides(updated)
+                      }}
+                      placeholder="Party Ready!"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
