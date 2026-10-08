@@ -14,8 +14,11 @@ import {
   CheckCircle2,
   Calendar,
   Package,
-  SlidersHorizontal,
+  Heart,
+  Star,
   X,
+  CreditCard,
+  ShoppingBag,
   Camera,
   Smartphone,
   Laptop,
@@ -27,9 +30,6 @@ import {
   Armchair,
   HeartPulse,
   Building,
-  Heart,
-  Store,
-  Clock,
   RefreshCw,
 } from 'lucide-react';
 import {
@@ -39,96 +39,77 @@ import {
   getAllCities,
 } from '@/lib/location/sri-lanka';
 
-// Fallback category configuration for icons & pastel themes
-const CATEGORY_UI_CONFIG: Record<
-  string,
-  { icon: any; colorBg: string; colorText: string; darkBg: string }
-> = {
-  'camera-video': {
-    icon: Camera,
-    colorBg: 'bg-rose-50 border-rose-100',
-    colorText: 'text-rose-600',
-    darkBg: 'dark:bg-rose-950/30 dark:border-rose-900/40',
+// Curated Category configuration matching the reference image layout & pastel style
+const CATEGORY_ITEMS = [
+  {
+    name: 'Electronics',
+    slug: 'it-equipment',
+    count: '120+',
+    bgColor: 'bg-blue-50/90 dark:bg-blue-950/40 border-blue-100 dark:border-blue-900/40',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    imageUrl: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=300&q=80',
   },
-  'mobile-tablets': {
-    icon: Smartphone,
-    colorBg: 'bg-sky-50 border-sky-100',
-    colorText: 'text-sky-600',
-    darkBg: 'dark:bg-sky-950/30 dark:border-sky-900/40',
+  {
+    name: 'Cameras',
+    slug: 'camera-video',
+    count: '85+',
+    bgColor: 'bg-pink-50/90 dark:bg-pink-950/40 border-pink-100 dark:border-pink-900/40',
+    iconColor: 'text-pink-600 dark:text-pink-400',
+    imageUrl: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=300&q=80',
   },
-  'it-equipment': {
-    icon: Laptop,
-    colorBg: 'bg-indigo-50 border-indigo-100',
-    colorText: 'text-indigo-600',
-    darkBg: 'dark:bg-indigo-950/30 dark:border-indigo-900/40',
+  {
+    name: 'Outdoor & Sports',
+    slug: 'sports-outdoors',
+    count: '65+',
+    bgColor: 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/40',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    imageUrl: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&w=300&q=80',
   },
-  vehicles: {
-    icon: Car,
-    colorBg: 'bg-amber-50 border-amber-100',
-    colorText: 'text-amber-600',
-    darkBg: 'dark:bg-amber-950/30 dark:border-amber-900/40',
+  {
+    name: 'Vehicles',
+    slug: 'vehicles',
+    count: '45+',
+    bgColor: 'bg-purple-50/90 dark:bg-purple-950/40 border-purple-100 dark:border-purple-900/40',
+    iconColor: 'text-purple-600 dark:text-purple-400',
+    imageUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=300&q=80',
   },
-  'clothing-bridal': {
-    icon: Shirt,
-    colorBg: 'bg-pink-50 border-pink-100',
-    colorText: 'text-pink-600',
-    darkBg: 'dark:bg-pink-950/30 dark:border-pink-900/40',
+  {
+    name: 'Fashion',
+    slug: 'clothing-bridal',
+    count: '70+',
+    bgColor: 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900/40',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    imageUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=300&q=80',
   },
-  'party-events': {
-    icon: Sparkles,
-    colorBg: 'bg-purple-50 border-purple-100',
-    colorText: 'text-purple-600',
-    darkBg: 'dark:bg-purple-950/30 dark:border-purple-900/40',
+  {
+    name: 'Tools & Equipment',
+    slug: 'tools-equipment',
+    count: '50+',
+    bgColor: 'bg-orange-50/90 dark:bg-orange-950/40 border-orange-100 dark:border-orange-900/40',
+    iconColor: 'text-orange-600 dark:text-orange-400',
+    imageUrl: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=300&q=80',
   },
-  'tools-equipment': {
-    icon: Wrench,
-    colorBg: 'bg-emerald-50 border-emerald-100',
-    colorText: 'text-emerald-600',
-    darkBg: 'dark:bg-emerald-950/30 dark:border-emerald-900/40',
+  {
+    name: 'Home Appliances',
+    slug: 'furniture-appliances',
+    count: '40+',
+    bgColor: 'bg-sky-50/90 dark:bg-sky-950/40 border-sky-100 dark:border-sky-900/40',
+    iconColor: 'text-sky-600 dark:text-sky-400',
+    imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=300&q=80',
   },
-  'sports-outdoors': {
-    icon: Compass,
-    colorBg: 'bg-teal-50 border-teal-100',
-    colorText: 'text-teal-600',
-    darkBg: 'dark:bg-teal-950/30 dark:border-teal-900/40',
+  {
+    name: 'Party & Events',
+    slug: 'party-events',
+    count: '35+',
+    bgColor: 'bg-rose-50/90 dark:bg-rose-950/40 border-rose-100 dark:border-rose-900/40',
+    iconColor: 'text-rose-600 dark:text-rose-400',
+    imageUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=300&q=80',
   },
-  'sound-stage': {
-    icon: Volume2,
-    colorBg: 'bg-violet-50 border-violet-100',
-    colorText: 'text-violet-600',
-    darkBg: 'dark:bg-violet-950/30 dark:border-violet-900/40',
-  },
-  'furniture-appliances': {
-    icon: Armchair,
-    colorBg: 'bg-orange-50 border-orange-100',
-    colorText: 'text-orange-600',
-    darkBg: 'dark:bg-orange-950/30 dark:border-orange-900/40',
-  },
-  medical: {
-    icon: HeartPulse,
-    colorBg: 'bg-red-50 border-red-100',
-    colorText: 'text-red-600',
-    darkBg: 'dark:bg-red-950/30 dark:border-red-900/40',
-  },
-  'rooms-halls-studios': {
-    icon: Building,
-    colorBg: 'bg-blue-50 border-blue-100',
-    colorText: 'text-blue-600',
-    darkBg: 'dark:bg-blue-950/30 dark:border-blue-900/40',
-  },
-  default: {
-    icon: Package,
-    colorBg: 'bg-slate-50 border-slate-100',
-    colorText: 'text-slate-600',
-    darkBg: 'dark:bg-slate-900 dark:border-slate-800',
-  },
-};
+];
 
 export default function MarketplaceHomePage() {
   const [ads, setAds] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   // Search & Filter State
   const [search, setSearch] = useState('');
@@ -138,44 +119,24 @@ export default function MarketplaceHomePage() {
   const [category, setCategory] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalAds, setTotalAds] = useState(0);
+  const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
 
-  // Sri Lanka location data
+  // Location data
   const provinces = useMemo(() => getAllProvinces(), []);
   const availableDistricts = useMemo(
     () => (province ? getDistrictsByProvince(province) : []),
     [province]
   );
   const availableCities = useMemo(() => {
-    if (district) {
-      return getCitiesByDistrict(district, province);
-    }
+    if (district) return getCitiesByDistrict(district, province);
     if (province) {
-      const districts = getDistrictsByProvince(province);
+      const dists = getDistrictsByProvince(province);
       return Array.from(
-        new Set(districts.flatMap((d) => getCitiesByDistrict(d, province)))
+        new Set(dists.flatMap((d) => getCitiesByDistrict(d, province)))
       ).sort((a, b) => a.localeCompare(b));
     }
     return getAllCities();
   }, [province, district]);
-
-  // Fetch Categories from API
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const res = await fetch('/api/categories');
-        const data = await res.json();
-        if (data?.categories) {
-          setCategories(data.categories);
-        }
-      } catch (err) {
-        console.error('Failed to load categories', err);
-      } finally {
-        setCategoriesLoading(false);
-      }
-    }
-    fetchCategories();
-  }, []);
 
   // Fetch Marketplace Ads from API
   const fetchAds = async () => {
@@ -183,27 +144,21 @@ export default function MarketplaceHomePage() {
     try {
       const params = new URLSearchParams();
       if (search.trim()) params.append('search', search.trim());
-
-      // If city is explicitly selected, filter by city
       if (city) {
         params.append('city', city);
       } else if (district) {
-        // Search by district name in city field
         params.append('city', district);
       } else if (province) {
-        // Search by province
         params.append('city', province);
       }
-
       if (category) params.append('category', category);
       params.append('page', page.toString());
-      params.append('limit', '12');
+      params.append('limit', '10');
 
       const res = await fetch(`/api/marketplace/ads?${params.toString()}`);
       const data = await res.json();
       setAds(data.ads || []);
       setTotalPages(data.pagination?.totalPages || 1);
-      setTotalAds(data.pagination?.total || (data.ads ? data.ads.length : 0));
     } catch (error) {
       console.error('Failed to fetch ads', error);
       setAds([]);
@@ -216,25 +171,10 @@ export default function MarketplaceHomePage() {
     fetchAds();
   }, [search, province, district, city, category, page]);
 
-  // Handle location cascading changes
-  const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = e.target.value;
-    setProvince(selected);
-    setDistrict('');
-    setCity('');
-    setPage(1);
-  };
-
-  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = e.target.value;
-    setDistrict(selected);
-    setCity('');
-    setPage(1);
-  };
-
-  const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setCity(e.target.value);
-    setPage(1);
+  const toggleWishlist = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setWishlist((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const clearAllFilters = () => {
@@ -249,55 +189,70 @@ export default function MarketplaceHomePage() {
   const hasActiveFilters = Boolean(search || province || district || city || category);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors selection:bg-teal-500 selection:text-white">
       <Header />
 
-      <main className="flex-1 py-6 sm:py-10">
+      <main className="flex-1 py-6 sm:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* ─────────────────────────────────────────────────────────────
-              1. HERO SECTION
+              1. HERO SECTION (Matching Reference Image Vibe & Layout)
           ───────────────────────────────────────────────────────────── */}
-          <section className="relative rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white p-6 sm:p-10 lg:p-14 mb-12 shadow-2xl overflow-hidden border border-slate-700/50">
-            {/* Ambient Background Glows */}
-            <div className="absolute -top-32 -right-32 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
+          <section className="relative rounded-[2.5rem] overflow-hidden shadow-2xl mb-12 border border-slate-200/50 dark:border-slate-800">
+            {/* Background Mountain Image */}
+            <div
+              className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
+              style={{
+                backgroundImage: `url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1600&q=80')`,
+              }}
+            />
 
-            <div className="relative z-10 max-w-3xl">
-              {/* Green Accent Pill */}
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md mb-6 shadow-sm">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Rent Anything, Anywhere</span>
+            {/* Dark Scenic Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/70 to-slate-950/30 dark:from-slate-950/95 dark:via-slate-950/80 dark:to-slate-950/50" />
+
+            <div className="relative z-10 px-6 sm:px-12 lg:px-16 pt-12 sm:pt-16 pb-20 sm:pb-24 flex flex-col justify-between min-h-[460px]">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="max-w-2xl">
+                  {/* Top Green Pill Badge */}
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-teal-500 text-white shadow-lg backdrop-blur-md mb-6">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Rent Anything, Anywhere</span>
+                  </div>
+
+                  {/* Headline */}
+                  <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-[1.15]">
+                    Need an Item?{' '}
+                    <span className="block text-teal-400 dark:text-teal-300 font-extrabold mt-1 drop-shadow-md">
+                      Rent It Instead!
+                    </span>
+                  </h1>
+
+                  {/* Subtitle */}
+                  <p className="mt-4 text-base sm:text-lg text-slate-200 font-medium leading-relaxed max-w-xl">
+                    From electronics to outdoor gear, find and rent the items you need — at the best prices, from people near you.
+                  </p>
+                </div>
+
+                {/* Handwritten Doodle Graphic Annotation */}
+                <div className="hidden lg:flex flex-col items-center rotate-6 text-amber-300 font-semibold tracking-wide drop-shadow-lg select-none">
+                  <span className="text-xl font-bold italic border-b-2 border-dashed border-amber-300/60 pb-1">
+                    More Choices ✨
+                  </span>
+                  <span className="text-2xl font-black text-white">
+                    Less Cost!
+                  </span>
+                </div>
               </div>
 
-              {/* Headline */}
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight">
-                Need an Item?{' '}
-                <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200 bg-clip-text text-transparent">
-                  Rent It Instead!
-                </span>
-              </h1>
-
-              {/* Subtitle */}
-              <p className="mt-4 text-base sm:text-lg text-slate-300 font-normal leading-relaxed max-w-2xl">
-                From photography gear and vehicles to event equipment and power tools — discover and rent items at fraction of the cost from trusted local providers across Sri Lanka.
-              </p>
-            </div>
-
-            {/* Floating Hero Search Box */}
-            <div className="relative z-10 mt-8 sm:mt-10 bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-6 shadow-2xl border border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white backdrop-blur-lg">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-center">
-                {/* Search Text Input */}
-                <div className="md:col-span-4 relative">
-                  <label htmlFor="hero-search" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    Keyword Search
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              {/* Floating White Search Card */}
+              <div className="mt-10 bg-white dark:bg-slate-900 rounded-full sm:rounded-full p-2 sm:p-3 shadow-2xl border border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white backdrop-blur-xl">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-2 px-2">
+                  {/* Search Input */}
+                  <div className="flex-1 flex items-center gap-3 px-4 py-2.5 w-full">
+                    <Search className="w-5 h-5 text-slate-400 shrink-0" />
                     <input
-                      id="hero-search"
                       type="text"
                       placeholder="What are you looking for?"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                      className="w-full bg-transparent text-sm font-medium focus:outline-none placeholder:text-slate-400 text-slate-900 dark:text-white"
                       value={search}
                       onChange={(e) => {
                         setSearch(e.target.value);
@@ -305,84 +260,56 @@ export default function MarketplaceHomePage() {
                       }}
                     />
                   </div>
-                </div>
 
-                {/* Province Dropdown */}
-                <div className="md:col-span-2 relative">
-                  <label htmlFor="province-filter" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    Province
-                  </label>
-                  <select
-                    id="province-filter"
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition appearance-none cursor-pointer"
-                    value={province}
-                    onChange={handleProvinceChange}
-                  >
-                    <option value="">All Provinces</option>
-                    {provinces.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Vertical Divider */}
+                  <div className="hidden md:block w-px h-8 bg-slate-200 dark:bg-slate-800" />
 
-                {/* District Dropdown */}
-                <div className="md:col-span-2 relative">
-                  <label htmlFor="district-filter" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    District
-                  </label>
-                  <select
-                    id="district-filter"
-                    disabled={!province}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    value={district}
-                    onChange={handleDistrictChange}
-                  >
-                    <option value="">
-                      {!province ? 'Select Province' : 'All Districts'}
-                    </option>
-                    {availableDistricts.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* City Dropdown */}
-                <div className="md:col-span-2 relative">
-                  <label htmlFor="city-filter" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    City
-                  </label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                  {/* Cascading Location Selectors */}
+                  <div className="flex items-center gap-2 px-3 py-2 w-full md:w-auto">
+                    <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
                     <select
-                      id="city-filter"
-                      className="w-full pl-8 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition appearance-none cursor-pointer"
-                      value={city}
-                      onChange={handleCityChange}
+                      className="bg-transparent text-sm font-semibold focus:outline-none cursor-pointer text-slate-700 dark:text-slate-200 max-w-[140px] truncate"
+                      value={province}
+                      onChange={(e) => {
+                        setProvince(e.target.value);
+                        setDistrict('');
+                        setCity('');
+                        setPage(1);
+                      }}
                     >
-                      <option value="">All Cities</option>
+                      <option value="" className="text-slate-900 dark:text-white">All Provinces</option>
+                      {provinces.map((p) => (
+                        <option key={p} value={p} className="text-slate-900 dark:text-white">
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      className="bg-transparent text-sm font-semibold focus:outline-none cursor-pointer text-slate-700 dark:text-slate-200 max-w-[140px] truncate"
+                      value={city}
+                      onChange={(e) => {
+                        setCity(e.target.value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="" className="text-slate-900 dark:text-white">All Cities</option>
                       {availableCities.map((c) => (
-                        <option key={c} value={c}>
+                        <option key={c} value={c} className="text-slate-900 dark:text-white">
                           {c}
                         </option>
                       ))}
                     </select>
                   </div>
-                </div>
 
-                {/* Search Button */}
-                <div className="md:col-span-2 flex items-end">
+                  {/* Search Action Button */}
                   <button
                     onClick={() => {
                       setPage(1);
                       fetchAds();
                     }}
-                    className="w-full py-2.5 px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-lg hover:shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                    className="w-full md:w-auto bg-teal-600 hover:bg-teal-700 text-white font-bold px-8 py-3 rounded-full shadow-lg hover:shadow-teal-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95"
                   >
-                    <Search className="w-4 h-4 group-hover:scale-110 transition-transform" />
                     <span>Search</span>
                   </button>
                 </div>
@@ -399,82 +326,70 @@ export default function MarketplaceHomePage() {
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                   Browse by Category
                 </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Find the perfect rental item for your needs
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                  Find the perfect item for your needs
                 </p>
               </div>
 
-              {category && (
-                <button
-                  onClick={() => {
-                    setCategory('');
-                    setPage(1);
-                  }}
-                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  Clear Category Filter
-                </button>
-              )}
+              <Link
+                href="/#browse"
+                className="text-sm font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 group"
+              >
+                <span>View All</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
 
-            {categoriesLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {[...Array(6)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-28 bg-white dark:bg-slate-900 rounded-2xl animate-pulse border border-slate-100 dark:border-slate-800"
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {categories.map((cat) => {
-                  const ui = CATEGORY_UI_CONFIG[cat.slug] || CATEGORY_UI_CONFIG.default;
-                  const IconComp = ui.icon;
-                  const isSelected = category === cat.slug;
-                  const itemCount = cat._count?.items ?? 0;
+            {/* Category Cards Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3.5">
+              {CATEGORY_ITEMS.map((cat) => {
+                const isSelected = category === cat.slug;
+                return (
+                  <button
+                    key={cat.name}
+                    onClick={() => {
+                      setCategory(isSelected ? '' : cat.slug);
+                      setPage(1);
+                    }}
+                    className={`p-3.5 rounded-2xl border text-center transition-all duration-300 flex flex-col items-center justify-between group cursor-pointer ${
+                      isSelected
+                        ? 'bg-teal-500 text-white border-teal-600 shadow-lg scale-105 ring-2 ring-teal-500/30'
+                        : `${cat.bgColor} hover:shadow-md hover:-translate-y-1.5`
+                    }`}
+                  >
+                    {/* Category Image Box */}
+                    <div className="w-14 h-14 rounded-xl overflow-hidden mb-2 shadow-xs group-hover:scale-105 transition-transform bg-white dark:bg-slate-800 p-1 flex items-center justify-center">
+                      <img
+                        src={cat.imageUrl}
+                        alt={cat.name}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    </div>
 
-                  return (
-                    <button
-                      key={cat.id || cat.slug}
-                      onClick={() => {
-                        setCategory(isSelected ? '' : cat.slug);
-                        setPage(1);
-                      }}
-                      className={`p-4 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between group cursor-pointer ${
-                        isSelected
-                          ? 'bg-emerald-50/90 dark:bg-emerald-950/50 border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-500/20 shadow-md'
-                          : `bg-white dark:bg-slate-900 border-slate-200/70 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md hover:-translate-y-1`
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center border ${ui.colorBg} ${ui.colorText} ${ui.darkBg} group-hover:scale-110 transition-transform`}
-                        >
-                          <IconComp className="w-5 h-5" />
-                        </div>
-                        {isSelected && (
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        )}
-                      </div>
-
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                          {cat.name}
-                        </h3>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                          {itemCount > 0 ? `${itemCount}+ Available` : 'Available'}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                    <div>
+                      <h3
+                        className={`text-xs font-bold line-clamp-1 ${
+                          isSelected ? 'text-white' : 'text-slate-900 dark:text-white'
+                        }`}
+                      >
+                        {cat.name}
+                      </h3>
+                      <p
+                        className={`text-[10px] font-semibold mt-0.5 ${
+                          isSelected ? 'text-teal-100' : 'text-slate-500 dark:text-slate-400'
+                        }`}
+                      >
+                        ({cat.count})
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </section>
 
           {/* ─────────────────────────────────────────────────────────────
-              3. POPULAR & FEATURED ITEMS FOR RENT
+              3. POPULAR ITEMS FOR RENT SECTION
           ───────────────────────────────────────────────────────────── */}
           <section id="browse" className="mb-16 scroll-mt-24">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -482,58 +397,35 @@ export default function MarketplaceHomePage() {
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                   Popular Items for Rent
                 </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Discover top-rated and available items near you
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                  Discover top-rated and most rented items in your area
                 </p>
               </div>
 
-              {/* Active Filter Badges */}
-              {hasActiveFilters && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                    Active Filters:
-                  </span>
-                  {category && (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded-full border border-emerald-300 dark:border-emerald-800">
-                      Category: {category}
-                      <X
-                        className="w-3 h-3 cursor-pointer hover:opacity-75"
-                        onClick={() => setCategory('')}
-                      />
-                    </span>
-                  )}
-                  {city && (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded-full border border-emerald-300 dark:border-emerald-800">
-                      City: {city}
-                      <X
-                        className="w-3 h-3 cursor-pointer hover:opacity-75"
-                        onClick={() => setCity('')}
-                      />
-                    </span>
-                  )}
-                  {search && (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded-full border border-emerald-300 dark:border-emerald-800">
-                      Query: &quot;{search}&quot;
-                      <X
-                        className="w-3 h-3 cursor-pointer hover:opacity-75"
-                        onClick={() => setSearch('')}
-                      />
-                    </span>
-                  )}
+              <div className="flex items-center gap-3">
+                {hasActiveFilters && (
                   <button
                     onClick={clearAllFilters}
-                    className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline ml-1 cursor-pointer"
+                    className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1 cursor-pointer"
                   >
-                    Clear All
+                    <RefreshCw className="w-3 h-3" />
+                    Reset Filters
                   </button>
-                </div>
-              )}
+                )}
+                <Link
+                  href="/#browse"
+                  className="text-sm font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 group"
+                >
+                  <span>View All</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
             </div>
 
-            {/* Listing Grid */}
+            {/* Ads Cards Grid */}
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[...Array(8)].map((_, i) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                {[...Array(5)].map((_, i) => (
                   <div
                     key={i}
                     className="bg-white dark:bg-slate-900 rounded-2xl h-80 animate-pulse border border-slate-100 dark:border-slate-800 shadow-xs"
@@ -541,115 +433,124 @@ export default function MarketplaceHomePage() {
                 ))}
               </div>
             ) : ads.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {ads.map((ad: any) => (
-                  <Link
-                    href={`/marketplace/${ad.id}`}
-                    key={ad.id}
-                    className="group block h-full"
-                  >
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-slate-200/80 dark:border-slate-800 flex flex-col h-full hover:-translate-y-1">
-                      {/* Image Container */}
-                      <div className="relative h-52 bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                        {ad.coverImageUrl ? (
-                          <img
-                            src={ad.coverImageUrl}
-                            alt={ad.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-semibold gap-1">
-                            <Package className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                            <span>No Preview Image</span>
-                          </div>
-                        )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                {ads.map((ad: any, idx: number) => {
+                  const badgeType =
+                    idx % 3 === 0 ? 'Featured' : idx % 3 === 1 ? 'Bestseller' : 'Popular';
+                  const badgeColor =
+                    badgeType === 'Featured'
+                      ? 'bg-teal-600 text-white'
+                      : badgeType === 'Bestseller'
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-purple-600 text-white';
 
-                        {/* Status Badge */}
-                        <div className="absolute top-3 left-3">
-                          <span className="inline-flex items-center gap-1 bg-emerald-600/90 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-md backdrop-blur-md">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Available
-                          </span>
-                        </div>
-                      </div>
+                  const isWishlisted = Boolean(wishlist[ad.id]);
 
-                      {/* Content Section */}
-                      <div className="p-5 flex-1 flex flex-col justify-between">
-                        <div>
-                          <h3 className="text-base font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                            {ad.title}
-                          </h3>
-
-                          <div className="flex items-center text-slate-500 dark:text-slate-400 text-xs font-medium mt-1.5 gap-1">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            <span className="truncate">{ad.city || 'Sri Lanka'}</span>
-                          </div>
-                        </div>
-
-                        {/* Price & Provider Footer */}
-                        <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800/80">
-                          <div className="flex items-end justify-between mb-3">
-                            <div>
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                Daily Rate
-                              </p>
-                              <p className="text-lg font-black text-slate-900 dark:text-white">
-                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mr-0.5">
-                                  LKR
-                                </span>
-                                {(ad.dailyPrice || ad.hourlyPrice || 0).toLocaleString()}
-                                <span className="text-xs font-normal text-slate-500">
-                                  /day
-                                </span>
-                              </p>
+                  return (
+                    <Link
+                      href={`/marketplace/${ad.id}`}
+                      key={ad.id}
+                      className="group block h-full"
+                    >
+                      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-200/80 dark:border-slate-800 overflow-hidden flex flex-col h-full hover:-translate-y-1.5">
+                        {/* Top Image Box */}
+                        <div className="relative h-48 bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          {ad.coverImageUrl ? (
+                            <img
+                              src={ad.coverImageUrl}
+                              alt={ad.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-semibold gap-1">
+                              <Package className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                              <span>No Preview Image</span>
                             </div>
+                          )}
 
-                            {/* Provider Info */}
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-800 flex items-center justify-center text-emerald-700 dark:text-emerald-300 text-[10px] font-bold overflow-hidden">
-                                {ad.business?.logo ? (
-                                  <img
-                                    src={ad.business.logo}
-                                    alt=""
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  ad.business?.name?.[0]?.toUpperCase() || 'P'
-                                )}
-                              </div>
-                              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate max-w-[80px]">
-                                {ad.business?.name || 'Verified'}
+                          {/* Left Badge */}
+                          <div className="absolute top-2.5 left-2.5">
+                            <span
+                              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-md ${badgeColor}`}
+                            >
+                              {badgeType}
+                            </span>
+                          </div>
+
+                          {/* Heart Wishlist Icon */}
+                          <button
+                            onClick={(e) => toggleWishlist(ad.id, e)}
+                            className="absolute top-2.5 right-2.5 p-1.5 bg-white/90 dark:bg-slate-900/90 rounded-full shadow-md text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                            aria-label="Favorite"
+                          >
+                            <Heart
+                              className={`w-3.5 h-3.5 ${
+                                isWishlisted ? 'fill-rose-500 text-rose-500' : ''
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {/* Card Body */}
+                        <div className="p-4 flex-1 flex flex-col justify-between">
+                          <div>
+                            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-1 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                              {ad.title}
+                            </h3>
+
+                            {/* Price */}
+                            <p className="text-sm font-black text-slate-900 dark:text-white mt-1">
+                              LKR {(ad.dailyPrice || ad.hourlyPrice || 0).toLocaleString()}
+                              <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                                {' '}
+                                / day
                               </span>
+                            </p>
+
+                            {/* Rating & Reviews */}
+                            <div className="flex items-center gap-1 mt-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                              <span className="text-slate-900 dark:text-white font-bold">
+                                4.8
+                              </span>
+                              <span>(18 reviews)</span>
+                            </div>
+
+                            {/* Location */}
+                            <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                              <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{ad.city || 'Colombo'}</span>
                             </div>
                           </div>
 
-                          {/* Rent Now Action Button */}
-                          <div className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl text-center shadow-sm group-hover:shadow-md transition-all flex items-center justify-center gap-1.5">
-                            <span>Rent Now</span>
-                            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                          {/* Rent Now Solid Button */}
+                          <div className="mt-4 pt-2">
+                            <div className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-full text-center shadow-md transition-all group-hover:scale-[1.02]">
+                              Rent Now
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
               /* Polished Empty State */
-              <div className="text-center py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm max-w-2xl mx-auto">
-                <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-200/60 dark:border-emerald-800">
-                  <Search className="w-8 h-8" />
+              <div className="text-center py-14 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm max-w-xl mx-auto">
+                <div className="w-14 h-14 bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-teal-200 dark:border-teal-800">
+                  <Search className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                   No Rental Listings Found
                 </h3>
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                  We couldn&apos;t find any active rental ads matching your search criteria or selected filters.
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Try clearing your search query or selecting a different city or category.
                 </p>
                 {hasActiveFilters && (
                   <button
                     onClick={clearAllFilters}
-                    className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-emerald-600 hover:bg-emerald-700 shadow-md transition-all cursor-pointer"
+                    className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full font-bold text-xs text-white bg-teal-600 hover:bg-teal-700 shadow-md transition-all cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>Reset All Filters</span>
@@ -660,22 +561,22 @@ export default function MarketplaceHomePage() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="mt-12 flex justify-center items-center space-x-3">
+              <div className="mt-10 flex justify-center items-center space-x-3">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                  className="p-2.5 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                   aria-label="Previous page"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-300 px-3">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 px-2">
                   Page {page} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                  className="p-2.5 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                   aria-label="Next page"
                 >
                   <ChevronRight className="w-5 h-5" />
@@ -685,72 +586,74 @@ export default function MarketplaceHomePage() {
           </section>
 
           {/* ─────────────────────────────────────────────────────────────
-              4. HOW IT WORKS SECTION
+              4. HOW IT WORKS SECTION (Matching Soft Mint Card Style)
           ───────────────────────────────────────────────────────────── */}
           <section id="how-it-works" className="mb-16 scroll-mt-24">
-            <div className="text-center max-w-2xl mx-auto mb-12">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
-                Simple & Transparent
-              </span>
-              <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight mt-3">
-                How RentHelper Works
-              </h2>
-              <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2">
-                Renting equipment and items is fast, secure, and hassle-free in 4 easy steps.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Step 1 */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs relative group hover:border-emerald-500/40 transition-all">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center font-black text-lg mb-4 group-hover:scale-110 transition-transform">
-                  1
+            <div className="bg-[#EBF7F4] dark:bg-teal-950/40 rounded-3xl p-8 sm:p-12 border border-teal-100 dark:border-teal-900/50">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    How It Works
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+                    Renting is simple, safe and fast!
+                  </p>
                 </div>
-                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  Search & Discover
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                  Browse thousands of rental items by category, location, or provider across Sri Lanka.
-                </p>
               </div>
 
-              {/* Step 2 */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs relative group hover:border-emerald-500/40 transition-all">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center font-black text-lg mb-4 group-hover:scale-110 transition-transform">
-                  2
+              {/* 4 Process Steps */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-center">
+                {/* Step 1 */}
+                <div className="flex flex-col items-center text-center group">
+                  <div className="w-14 h-14 rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <Search className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    1. Search
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-[200px]">
+                    Find the item you need from our marketplace.
+                  </p>
                 </div>
-                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  Select & Request
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                  Choose your required pickup and return dates, then submit a rental request to the owner.
-                </p>
-              </div>
 
-              {/* Step 3 */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs relative group hover:border-emerald-500/40 transition-all">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center font-black text-lg mb-4 group-hover:scale-110 transition-transform">
-                  3
+                {/* Step 2 */}
+                <div className="flex flex-col items-center text-center group">
+                  <div className="w-14 h-14 rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <Calendar className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    2. Book
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-[200px]">
+                    Choose your dates and make a reservation.
+                  </p>
                 </div>
-                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  Confirm & Reserve
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                  Get fast provider approval and confirm your booking details with complete transparency.
-                </p>
-              </div>
 
-              {/* Step 4 */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs relative group hover:border-emerald-500/40 transition-all">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center font-black text-lg mb-4 group-hover:scale-110 transition-transform">
-                  4
+                {/* Step 3 */}
+                <div className="flex flex-col items-center text-center group">
+                  <div className="w-14 h-14 rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    3. Pay Securely
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-[200px]">
+                    Complete the payment using our secure system.
+                  </p>
                 </div>
-                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  Pick Up & Enjoy
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                  Collect your item or arrange delivery, use it for your project, and return when finished!
-                </p>
+
+                {/* Step 4 */}
+                <div className="flex flex-col items-center text-center group">
+                  <div className="w-14 h-14 rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <Package className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    4. Pick Up & Enjoy
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-[200px]">
+                    Get the item and start using it!
+                  </p>
+                </div>
               </div>
             </div>
           </section>
@@ -758,118 +661,50 @@ export default function MarketplaceHomePage() {
       </main>
 
       {/* ─────────────────────────────────────────────────────────────
-          5. FOOTER
+          5. FOOTER (Matching Dark Sleek Footer Style)
       ───────────────────────────────────────────────────────────── */}
-      <footer className="bg-slate-950 text-slate-400 border-t border-slate-800 pt-14 pb-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-          {/* Col 1: Brand */}
-          <div className="space-y-4">
-            <Link href="/" className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md">
-                R
-              </div>
-              <span className="text-xl font-black text-white tracking-tight">
+      <footer className="bg-[#0B132B] text-slate-300 py-12 px-4 sm:px-6 lg:px-8 border-t border-slate-800">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 pb-8 border-b border-slate-800">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-teal-500 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md">
+              R
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-black text-white tracking-tight">
                 RentHelper
               </span>
-            </Link>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Smart, transparent, and trusted rental management connecting equipment owners and renters across Sri Lanka.
-            </p>
-            <div className="pt-2">
-              <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400 font-semibold bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-800">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Verified Local Rentals
+              <span className="text-[9px] text-teal-400 uppercase tracking-widest font-semibold -mt-1">
+                Rent • Use • Enjoy
               </span>
             </div>
-          </div>
+          </Link>
 
-          {/* Col 2: Navigation */}
-          <div>
-            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
-              Marketplace
-            </h4>
-            <ul className="space-y-2.5 text-xs">
-              <li>
-                <Link href="/" className="hover:text-emerald-400 transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link href="/#browse" className="hover:text-emerald-400 transition-colors">
-                  Browse All Items
-                </Link>
-              </li>
-              <li>
-                <Link href="/#how-it-works" className="hover:text-emerald-400 transition-colors">
-                  How It Works
-                </Link>
-              </li>
-              <li>
-                <Link href="/auth/signup" className="hover:text-emerald-400 transition-colors">
-                  Become a Provider
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Col 3: Legal & Support */}
-          <div>
-            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
-              Legal & Support
-            </h4>
-            <ul className="space-y-2.5 text-xs">
-              <li>
-                <Link href="/terms" className="hover:text-emerald-400 transition-colors">
-                  Platform Terms
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms/provider" className="hover:text-emerald-400 transition-colors">
-                  Provider Terms
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms/platform" className="hover:text-emerald-400 transition-colors">
-                  Privacy & Guidelines
-                </Link>
-              </li>
-              <li>
-                <Link href="/auth/signin" className="hover:text-emerald-400 transition-colors">
-                  User Account Login
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Col 4: Locations */}
-          <div>
-            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
-              Top Locations
-            </h4>
-            <div className="flex flex-wrap gap-1.5">
-              {['Colombo', 'Kandy', 'Galle', 'Negombo', 'Jaffna', 'Kurunegala', 'Matara'].map(
-                (cityName) => (
-                  <button
-                    key={cityName}
-                    onClick={() => {
-                      setCity(cityName);
-                      window.scrollTo({ top: 400, behavior: 'smooth' });
-                    }}
-                    className="text-[11px] px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 rounded-lg border border-slate-800 transition-colors cursor-pointer"
-                  >
-                    {cityName}
-                  </button>
-                )
-              )}
-            </div>
+          {/* Links */}
+          <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-semibold text-slate-400">
+            <Link href="/" className="hover:text-teal-400 transition-colors">
+              Home
+            </Link>
+            <Link href="/#browse" className="hover:text-teal-400 transition-colors">
+              Browse Items
+            </Link>
+            <Link href="/#how-it-works" className="hover:text-teal-400 transition-colors">
+              How It Works
+            </Link>
+            <Link href="/terms" className="hover:text-teal-400 transition-colors">
+              About
+            </Link>
+            <Link href="/terms/platform" className="hover:text-teal-400 transition-colors">
+              Contact
+            </Link>
           </div>
         </div>
 
-        {/* Bottom copyright bar */}
-        <div className="max-w-7xl mx-auto pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+        {/* Bottom copyright line */}
+        <div className="max-w-7xl mx-auto pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
           <p>© {new Date().getFullYear()} RentHelper. All rights reserved.</p>
-          <p className="flex items-center gap-1 text-slate-400 font-medium">
-            <span>Powered by RentHelper Sri Lanka</span>
+          <p className="text-slate-400 font-medium">
+            Smart Rental Marketplace Sri Lanka
           </p>
         </div>
       </footer>
