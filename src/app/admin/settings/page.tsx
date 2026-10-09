@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Save, Eye, EyeOff, Palette, Globe, Mail, CreditCard, Shield, CheckCircle, Package, Loader2, SendHorizonal, Sliders, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
+import { Save, Eye, EyeOff, Palette, Globe, Mail, CreditCard, Shield, CheckCircle, Package, Loader2, SendHorizonal, Sliders, Plus, Trash2, ArrowUp, ArrowDown, Upload, Image as ImageIcon } from 'lucide-react'
 import { HeroSlideItem, DEFAULT_HERO_SLIDES } from '@/app/api/hero-slides/route'
 
 interface SiteSettings {
@@ -108,6 +108,7 @@ export default function SettingsPage() {
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
   const [testEmailState, setTestEmailState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [testEmailMsg, setTestEmailMsg] = useState('')
+  const [uploadingSlideId, setUploadingSlideId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/settings')
@@ -140,27 +141,32 @@ export default function SettingsPage() {
 
   const save = async () => {
     setSaving(true)
-    const res = await fetch('/api/admin/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        itemFieldConfig: JSON.stringify(fieldConfig),
-        heroSlidesConfig: JSON.stringify(heroSlides),
-        heroSlideDurationSeconds: Number(heroSlideDuration) || 3,
-      }),
-    })
-    if (!res.ok) {
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          itemFieldConfig: JSON.stringify(fieldConfig),
+          heroSlidesConfig: JSON.stringify(heroSlides),
+          heroSlideDurationSeconds: Number(heroSlideDuration) || 3,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setSaving(false)
+        alert(data.message || data.error || 'Failed to save settings. Please try again.')
+        return
+      }
+      setSettings(data.settings)
+      setForm(data.settings)
       setSaving(false)
-      alert('Failed to save settings. Please try again.')
-      return
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (err) {
+      setSaving(false)
+      alert('Network error while saving settings. Please check your connection and try again.')
     }
-    const data = await res.json()
-    setSettings(data.settings)
-    setForm(data.settings)
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
   }
 
   const set = (key: keyof SiteSettings, value: string | number | boolean) =>
@@ -850,18 +856,94 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="admin-form-group">
-                    <label className="admin-form-label">Background Image URL (Unsplash / Direct)</label>
-                    <input
-                      className="admin-form-input"
-                      value={slide.imageUrl || ''}
-                      onChange={e => {
-                        const updated = [...heroSlides]
-                        updated[idx].imageUrl = e.target.value
-                        setHeroSlides(updated)
-                      }}
-                      placeholder="https://images.unsplash.com/..."
-                    />
+                  <div className="admin-form-group" style={{ gridColumn: 'span 2' }}>
+                    <label className="admin-form-label">Background Image (Upload File or Enter URL)</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <input
+                          type="file"
+                          id={`file-upload-${slide.id}`}
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          style={{ display: 'none' }}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+
+                            setUploadingSlideId(slide.id)
+                            try {
+                              const formData = new FormData()
+                              formData.append('images[]', file)
+
+                              const res = await fetch('/api/upload', {
+                                method: 'POST',
+                                body: formData,
+                              })
+                              const data = await res.json()
+
+                              if (!res.ok || !data.urls?.[0]) {
+                                alert(data.error || data.message || 'Image upload failed. Please try again.')
+                                return
+                              }
+
+                              const uploadedUrl = data.urls[0]
+                              const updated = [...heroSlides]
+                              updated[idx].imageUrl = uploadedUrl
+                              setHeroSlides(updated)
+                            } catch (error) {
+                              alert('Network error while uploading image.')
+                            } finally {
+                              setUploadingSlideId(null)
+                              e.target.value = ''
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn--secondary"
+                          disabled={uploadingSlideId === slide.id}
+                          onClick={() => {
+                            document.getElementById(`file-upload-${slide.id}`)?.click()
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          {uploadingSlideId === slide.id ? (
+                            <><Loader2 size={14} className="animate-spin" /> Uploading...</>
+                          ) : (
+                            <><Upload size={14} /> Upload Image File</>
+                          )}
+                        </button>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>or enter image URL below:</span>
+                      </div>
+
+                      <input
+                        className="admin-form-input"
+                        value={slide.imageUrl || ''}
+                        onChange={e => {
+                          const updated = [...heroSlides]
+                          updated[idx].imageUrl = e.target.value
+                          setHeroSlides(updated)
+                        }}
+                        placeholder="https://images.unsplash.com/... or uploaded image URL"
+                      />
+
+                      {slide.imageUrl && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={slide.imageUrl}
+                            alt="Slide Background Preview"
+                            style={{ width: '120px', height: '60px', objectFit: 'cover', borderRadius: '6px' }}
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none'
+                            }}
+                          />
+                          <div>
+                            <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>Image Preview</p>
+                            <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#94a3b8', wordBreak: 'break-all' }}>{slide.imageUrl}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="admin-form-group">
