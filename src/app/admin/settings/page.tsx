@@ -109,6 +109,8 @@ export default function SettingsPage() {
   const [testEmailState, setTestEmailState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [testEmailMsg, setTestEmailMsg] = useState('')
   const [uploadingSlideId, setUploadingSlideId] = useState<string | null>(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingFavicon, setUploadingFavicon] = useState(false)
 
   useEffect(() => {
     fetch('/api/admin/settings')
@@ -239,29 +241,160 @@ export default function SettingsPage() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Site Logo */}
             <div className="admin-form-group">
-              <label className="admin-form-label">Logo URL</label>
-              <input
-                className="admin-form-input"
-                value={form.logoUrl || ''}
-                onChange={e => set('logoUrl', e.target.value)}
-                placeholder="https://... or /logo.png"
-              />
-              {form.logoUrl && (
-                <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={form.logoUrl} alt="Logo preview" style={{ maxHeight: '50px', objectFit: 'contain' }} />
+              <label className="admin-form-label">Site Logo (Upload Image or enter URL)</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <input
+                    type="file"
+                    id="logo-file-upload"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/svg+xml"
+                    style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+
+                      setUploadingLogo(true)
+                      try {
+                        const formData = new FormData()
+                        formData.append('images[]', file)
+
+                        const res = await fetch('/api/upload', {
+                          method: 'POST',
+                          body: formData,
+                        })
+                        const data = await res.json()
+
+                        if (!res.ok || !data.urls?.[0]) {
+                          alert(data.error || data.message || 'Logo upload failed. Please try again.')
+                          return
+                        }
+
+                        set('logoUrl', data.urls[0])
+                      } catch {
+                        alert('Network error while uploading logo.')
+                      } finally {
+                        setUploadingLogo(false)
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary"
+                    disabled={uploadingLogo}
+                    onClick={() => document.getElementById('logo-file-upload')?.click()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    {uploadingLogo ? (
+                      <><Loader2 size={14} className="animate-spin" /> Uploading...</>
+                    ) : (
+                      <><Upload size={14} /> Upload Logo File</>
+                    )}
+                  </button>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>or URL:</span>
                 </div>
-              )}
+
+                <input
+                  className="admin-form-input"
+                  value={form.logoUrl || ''}
+                  onChange={e => set('logoUrl', e.target.value)}
+                  placeholder="https://... or uploaded image URL"
+                />
+
+                {form.logoUrl && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={form.logoUrl} alt="Logo preview" style={{ maxHeight: '45px', maxWidth: '140px', objectFit: 'contain' }} />
+                    <button
+                      type="button"
+                      onClick={() => set('logoUrl', '')}
+                      style={{ fontSize: '11px', color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Favicon */}
             <div className="admin-form-group">
-              <label className="admin-form-label">Favicon URL</label>
-              <input
-                className="admin-form-input"
-                value={form.faviconUrl || ''}
-                onChange={e => set('faviconUrl', e.target.value)}
-                placeholder="https://... or /favicon.ico"
-              />
+              <label className="admin-form-label">Favicon (Upload Image or enter URL)</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <input
+                    type="file"
+                    id="favicon-file-upload"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/x-icon,image/vnd.microsoft.icon,image/svg+xml"
+                    style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+
+                      setUploadingFavicon(true)
+                      try {
+                        const formData = new FormData()
+                        formData.append('images[]', file)
+
+                        const res = await fetch('/api/upload', {
+                          method: 'POST',
+                          body: formData,
+                        })
+                        const data = await res.json()
+
+                        if (!res.ok || !data.urls?.[0]) {
+                          alert(data.error || data.message || 'Favicon upload failed. Please try again.')
+                          return
+                        }
+
+                        set('faviconUrl', data.urls[0])
+                      } catch {
+                        alert('Network error while uploading favicon.')
+                      } finally {
+                        setUploadingFavicon(false)
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary"
+                    disabled={uploadingFavicon}
+                    onClick={() => document.getElementById('favicon-file-upload')?.click()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    {uploadingFavicon ? (
+                      <><Loader2 size={14} className="animate-spin" /> Uploading...</>
+                    ) : (
+                      <><Upload size={14} /> Upload Favicon File</>
+                    )}
+                  </button>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>or URL:</span>
+                </div>
+
+                <input
+                  className="admin-form-input"
+                  value={form.faviconUrl || ''}
+                  onChange={e => set('faviconUrl', e.target.value)}
+                  placeholder="https://... or /favicon.ico"
+                />
+
+                {form.faviconUrl && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={form.faviconUrl} alt="Favicon preview" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+                    <button
+                      type="button"
+                      onClick={() => set('faviconUrl', '')}
+                      style={{ fontSize: '11px', color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
