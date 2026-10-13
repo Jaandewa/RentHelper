@@ -61,8 +61,10 @@
   * { @apply border-border; }
   html {
     scroll-behavior: smooth;
-    /* Dark base so canvas particle network is visible */
-    background: #07061a;
+    background: #ffffff;   /* light mode — matches canvas white bg */
+  }
+  html.dark {
+    background: #07061a;   /* dark mode — matches canvas dark navy bg */
   }
   body {
     @apply text-foreground;
