@@ -1,55 +1,32 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 
 /**
  * CursorBackground
  *
- * Renders a full-page canvas behind all content.
- * – Soft glowing orbs that gently follow the cursor with lag
- * – Floating ambient particles that drift upward
- * – Subtle radial spotlight that tracks the mouse
- * Respects prefers-reduced-motion.
+ * Full-page canvas that sits fixed behind all content (z-index 0).
+ * • Large vivid glowing orbs that spring-follow the cursor
+ * • Bright cursor aura (glow ring around pointer)
+ * • Floating coloured particles drifting upward
+ * • Respects prefers-reduced-motion
  */
 export default function CursorBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const mouseRef = useRef({ x: -9999, y: -9999 })
   const rafRef = useRef<number>(0)
-
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const W = canvas.width
-    const H = canvas.height
-    ctx.clearRect(0, 0, W, H)
-
-    const mx = mouseRef.current.x
-    const my = mouseRef.current.y
-
-    // ── Spotlight halo around cursor ────────────────────────────────────────
-    if (mx > 0 && my > 0) {
-      const spotGrad = ctx.createRadialGradient(mx, my, 0, mx, my, 320)
-      spotGrad.addColorStop(0, 'rgba(139, 92, 246, 0.10)')  // violet
-      spotGrad.addColorStop(0.4, 'rgba(99, 102, 241, 0.05)')
-      spotGrad.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.fillStyle = spotGrad
-      ctx.fillRect(0, 0, W, H)
-    }
-  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    // Check reduced-motion preference
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (prefersReducedMotion) return
+    // Respect reduced-motion preference
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    const isDark = () => document.documentElement.classList.contains('dark')
 
     // ── Resize ───────────────────────────────────────────────────────────────
     const resize = () => {
@@ -59,155 +36,172 @@ export default function CursorBackground() {
     resize()
     window.addEventListener('resize', resize)
 
-    // ── Mouse tracking ───────────────────────────────────────────────────────
-    const onMouseMove = (e: MouseEvent) => {
-      mouseRef.current = { x: e.clientX, y: e.clientY }
-    }
-    window.addEventListener('mousemove', onMouseMove)
+    // ── Mouse ────────────────────────────────────────────────────────────────
+    const mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+    const onMove = (e: MouseEvent) => { mouse.x = e.clientX; mouse.y = e.clientY }
+    window.addEventListener('mousemove', onMove)
 
-    // ── Floating particles ───────────────────────────────────────────────────
-    interface Particle {
-      x: number; y: number; r: number
-      dx: number; dy: number
-      opacity: number; dOpacity: number
-      color: string
-    }
-
-    const COLORS = [
-      '139,92,246',  // violet
-      '99,102,241',  // indigo
-      '59,130,246',  // blue
-      '236,72,153',  // pink
-      '16,185,129',  // emerald
-    ]
-
-    const makeParticle = (): Particle => {
-      const W = canvas.width
-      const H = canvas.height
-      return {
-        x: Math.random() * W,
-        y: H + Math.random() * 100,
-        r: Math.random() * 2.5 + 0.5,
-        dx: (Math.random() - 0.5) * 0.4,
-        dy: -(Math.random() * 0.5 + 0.2),
-        opacity: 0,
-        dOpacity: Math.random() * 0.005 + 0.002,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
-      }
-    }
-
-    const PARTICLE_COUNT = 60
-    const particles: Particle[] = Array.from({ length: PARTICLE_COUNT }, makeParticle)
-    // Spread initial positions vertically so they don't all start at the bottom
-    particles.forEach(p => { p.y = Math.random() * canvas.height })
-
-    // ── Glowing orbs that lazily follow cursor ───────────────────────────────
+    // ── Orbs ─────────────────────────────────────────────────────────────────
     interface Orb {
-      x: number; y: number
-      tx: number; ty: number   // target (mouse-offset)
-      speed: number
-      r: number
-      color1: string; color2: string
-      offsetX: number; offsetY: number  // fixed offset from cursor
+      x: number; y: number       // current pos (lerped)
+      speed: number              // lerp factor
+      r: number                  // radius
+      offsetX: number            // fixed offset from cursor
+      offsetY: number
+      // light-mode colours
+      c1l: string; c2l: string
+      // dark-mode colours
+      c1d: string; c2d: string
     }
+
+    const W = () => canvas.width
+    const H = () => canvas.height
 
     const orbs: Orb[] = [
       {
-        x: 0, y: 0, tx: 0, ty: 0, speed: 0.035, r: 280,
-        color1: 'rgba(139,92,246,0.18)', color2: 'rgba(99,102,241,0)',
-        offsetX: -80, offsetY: -60,
+        x: W() / 2, y: H() / 2, speed: 0.04, r: 380,
+        offsetX: -60, offsetY: -40,
+        c1l: 'rgba(139,92,246,0.45)',  c2l: 'rgba(139,92,246,0)',
+        c1d: 'rgba(139,92,246,0.55)',  c2d: 'rgba(139,92,246,0)',
       },
       {
-        x: 0, y: 0, tx: 0, ty: 0, speed: 0.025, r: 220,
-        color1: 'rgba(236,72,153,0.14)', color2: 'rgba(236,72,153,0)',
-        offsetX: 100, offsetY: 80,
+        x: W() / 2, y: H() / 2, speed: 0.026, r: 300,
+        offsetX: 120, offsetY: 80,
+        c1l: 'rgba(236,72,153,0.38)', c2l: 'rgba(236,72,153,0)',
+        c1d: 'rgba(236,72,153,0.50)', c2d: 'rgba(236,72,153,0)',
       },
       {
-        x: 0, y: 0, tx: 0, ty: 0, speed: 0.018, r: 340,
-        color1: 'rgba(59,130,246,0.10)', color2: 'rgba(59,130,246,0)',
-        offsetX: 40, offsetY: -140,
+        x: W() / 2, y: H() / 2, speed: 0.018, r: 450,
+        offsetX: 30, offsetY: -180,
+        c1l: 'rgba(99,102,241,0.30)',  c2l: 'rgba(99,102,241,0)',
+        c1d: 'rgba(99,102,241,0.45)',  c2d: 'rgba(99,102,241,0)',
+      },
+      {
+        x: W() / 2, y: H() / 2, speed: 0.03, r: 260,
+        offsetX: -200, offsetY: 120,
+        c1l: 'rgba(16,185,129,0.28)',  c2l: 'rgba(16,185,129,0)',
+        c1d: 'rgba(16,185,129,0.42)',  c2d: 'rgba(16,185,129,0)',
       },
     ]
-    // initialise orb positions to center
-    const cx = canvas.width / 2, cy = canvas.height / 2
-    orbs.forEach(o => { o.x = cx; o.y = cy; o.tx = cx; o.ty = cy })
+
+    // ── Particles ────────────────────────────────────────────────────────────
+    interface Particle {
+      x: number; y: number
+      r: number
+      dx: number; dy: number
+      opacity: number
+      maxOpacity: number
+      fadeDir: 1 | -1
+      color: string
+    }
+
+    const COLORS_L = ['139,92,246','99,102,241','59,130,246','236,72,153','16,185,129','251,146,60']
+    const COLORS_D = ['167,139,250','129,140,248','96,165,250','244,114,182','52,211,153','251,191,36']
+
+    const makeParticle = (): Particle => {
+      const dark = isDark()
+      const cols = dark ? COLORS_D : COLORS_L
+      return {
+        x: Math.random() * canvas.width,
+        y: canvas.height + Math.random() * 80,
+        r: Math.random() * 3 + 1,
+        dx: (Math.random() - 0.5) * 0.6,
+        dy: -(Math.random() * 0.7 + 0.3),
+        opacity: 0,
+        maxOpacity: Math.random() * 0.6 + 0.3,
+        fadeDir: 1,
+        color: cols[Math.floor(Math.random() * cols.length)],
+      }
+    }
+
+    const PARTICLE_COUNT = 80
+    const particles: Particle[] = Array.from({ length: PARTICLE_COUNT }, () => {
+      const p = makeParticle()
+      // spread initial y positions
+      p.y = Math.random() * canvas.height
+      p.opacity = Math.random() * 0.4
+      return p
+    })
 
     // ── Animation loop ───────────────────────────────────────────────────────
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate)
-      const W = canvas.width
-      const H = canvas.height
+      const W = canvas.width, H = canvas.height
+      const dark = isDark()
+
       ctx.clearRect(0, 0, W, H)
 
-      const mx = mouseRef.current.x < 0 ? W / 2 : mouseRef.current.x
-      const my = mouseRef.current.y < 0 ? H / 2 : mouseRef.current.y
-
-      // Spotlight
-      if (mx > 0) {
-        const spotGrad = ctx.createRadialGradient(mx, my, 0, mx, my, 350)
-        spotGrad.addColorStop(0, 'rgba(139,92,246,0.08)')
-        spotGrad.addColorStop(0.5, 'rgba(99,102,241,0.03)')
-        spotGrad.addColorStop(1, 'rgba(0,0,0,0)')
-        ctx.fillStyle = spotGrad
-        ctx.fillRect(0, 0, W, H)
-      }
-
-      // Orbs
+      // — Orbs —
       orbs.forEach(o => {
-        o.tx = mx + o.offsetX
-        o.ty = my + o.offsetY
-        o.x += (o.tx - o.x) * o.speed
-        o.y += (o.ty - o.y) * o.speed
+        const tx = mouse.x + o.offsetX
+        const ty = mouse.y + o.offsetY
+        o.x += (tx - o.x) * o.speed
+        o.y += (ty - o.y) * o.speed
 
-        const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r)
-        grad.addColorStop(0, o.color1)
-        grad.addColorStop(1, o.color2)
-        ctx.fillStyle = grad
+        const c1 = dark ? o.c1d : o.c1l
+        const c2 = dark ? o.c2d : o.c2l
+        const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r)
+        g.addColorStop(0, c1)
+        g.addColorStop(1, c2)
+        ctx.fillStyle = g
         ctx.beginPath()
         ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2)
         ctx.fill()
       })
 
-      // Particles
+      // — Spotlight around cursor —
+      const sg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 220)
+      sg.addColorStop(0,   dark ? 'rgba(167,139,250,0.18)' : 'rgba(139,92,246,0.15)')
+      sg.addColorStop(0.4, dark ? 'rgba(99,102,241,0.07)'  : 'rgba(99,102,241,0.06)')
+      sg.addColorStop(1,   'rgba(0,0,0,0)')
+      ctx.fillStyle = sg
+      ctx.fillRect(0, 0, W, H)
+
+      // — Cursor glow ring —
+      const cg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 40)
+      cg.addColorStop(0,   dark ? 'rgba(167,139,250,0.70)' : 'rgba(139,92,246,0.60)')
+      cg.addColorStop(0.5, dark ? 'rgba(139,92,246,0.20)'  : 'rgba(139,92,246,0.18)')
+      cg.addColorStop(1,   'rgba(0,0,0,0)')
+      ctx.fillStyle = cg
+      ctx.beginPath()
+      ctx.arc(mouse.x, mouse.y, 40, 0, Math.PI * 2)
+      ctx.fill()
+
+      // — Particles —
+      const cols = dark ? COLORS_D : COLORS_L
       particles.forEach((p, i) => {
         p.x += p.dx
         p.y += p.dy
 
-        // Fade in at birth, fade out near top
-        if (p.y > H * 0.8) {
-          p.opacity = Math.min(p.opacity + p.dOpacity, 0.7)
-        } else {
-          p.opacity = Math.max(p.opacity - p.dOpacity * 0.5, 0)
+        // fade in / fade out
+        p.opacity += 0.008 * p.fadeDir
+        if (p.opacity >= p.maxOpacity) p.fadeDir = -1
+        if (p.opacity <= 0 && p.fadeDir === -1) {
+          // recycle
+          const np = makeParticle()
+          np.color = cols[Math.floor(Math.random() * cols.length)]
+          particles[i] = np
+          return
         }
 
-        // Reset when out of view
-        if (p.y < -20 || p.opacity <= 0 && p.y < H * 0.5) {
-          particles[i] = makeParticle()
+        // reset when off-screen top
+        if (p.y < -20) {
+          const np = makeParticle()
+          np.color = cols[Math.floor(Math.random() * cols.length)]
+          particles[i] = np
           return
         }
 
         ctx.save()
-        ctx.globalAlpha = p.opacity
+        ctx.globalAlpha = Math.max(0, p.opacity)
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
         ctx.fillStyle = `rgba(${p.color},1)`
-        ctx.shadowBlur = 6
-        ctx.shadowColor = `rgba(${p.color},0.8)`
+        ctx.shadowBlur = dark ? 12 : 8
+        ctx.shadowColor = `rgba(${p.color},0.9)`
         ctx.fill()
         ctx.restore()
       })
-
-      // Cursor dot glow
-      if (mx > 0) {
-        const dotGrad = ctx.createRadialGradient(mx, my, 0, mx, my, 28)
-        dotGrad.addColorStop(0, 'rgba(139,92,246,0.35)')
-        dotGrad.addColorStop(0.5, 'rgba(139,92,246,0.08)')
-        dotGrad.addColorStop(1, 'rgba(0,0,0,0)')
-        ctx.fillStyle = dotGrad
-        ctx.beginPath()
-        ctx.arc(mx, my, 28, 0, Math.PI * 2)
-        ctx.fill()
-      }
     }
 
     animate()
@@ -215,7 +209,7 @@ export default function CursorBackground() {
     return () => {
       cancelAnimationFrame(rafRef.current)
       window.removeEventListener('resize', resize)
-      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mousemove', onMove)
     }
   }, [])
 

@@ -60,7 +60,54 @@
 @layer base {
   * { @apply border-border; }
   html { scroll-behavior: smooth; }
-  body { @apply bg-background text-foreground; }
+  body {
+    @apply text-foreground;
+    /* Animated shifting gradient background — light mode */
+    background: linear-gradient(
+      135deg,
+      #f5f3ff 0%,
+      #ede9fe 15%,
+      #f0f9ff 35%,
+      #fdf4ff 55%,
+      #f0fdf4 75%,
+      #fefce8 100%
+    );
+    background-size: 400% 400%;
+    animation: bgShift 12s ease infinite;
+    min-height: 100vh;
+  }
+}
+
+/* ── Animated gradient background shift ──────────────────────────────────── */
+@keyframes bgShift {
+  0%   { background-position: 0% 50%; }
+  25%  { background-position: 100% 50%; }
+  50%  { background-position: 100% 0%; }
+  75%  { background-position: 0% 100%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Dark mode — deep rich gradient */
+.dark body {
+  background: linear-gradient(
+    135deg,
+    #0f0a1e 0%,
+    #1a0a2e 20%,
+    #0a1628 40%,
+    #1a0e2e 60%,
+    #0d1a2e 80%,
+    #0f0a1e 100%
+  ) !important;
+  background-size: 400% 400% !important;
+  animation: bgShiftDark 12s ease infinite !important;
+}
+
+@keyframes bgShiftDark {
+  0%   { background-position: 0% 50%; }
+  25%  { background-position: 100% 50%; }
+  50%  { background-position: 100% 0%; }
+  75%  { background-position: 0% 100%; }
+  100% { background-position: 0% 50%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
