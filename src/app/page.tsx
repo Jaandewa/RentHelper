@@ -231,7 +231,7 @@ export default function MarketplaceHomePage() {
   const hasActiveFilters = Boolean(search || province || district || city || category);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors selection:bg-teal-500 selection:text-white">
+    <div className="min-h-screen text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors selection:bg-teal-500 selection:text-white" style={{ background: 'transparent' }}>
       <Header />
 
       <main className="flex-1 py-6 sm:py-8">
